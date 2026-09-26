@@ -81,6 +81,10 @@ typedef struct {
     uint16_t cur_scroll_offset;
     uint32_t prev_scene_id;
     uint32_t current_scene_id;
+    uint8_t data_focus_index;
+    uint16_t data_scroll_offset;
+    uint8_t game_focus_path[8];
+    uint16_t game_scroll_path[8];
 } app_amiidb_cache_data_t;
 
 

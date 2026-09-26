@@ -94,7 +94,21 @@ void app_amiidb_on_run(mini_app_inst_t *p_app_inst) {
             p_app_handle->prev_scene_id = p_cache_data->prev_scene_id;
             p_app_handle->cur_focus_index = p_cache_data->current_focus_index;
             p_app_handle->cur_scroll_offset = p_cache_data->cur_scroll_offset;
-            mui_scene_dispatcher_next_scene(p_app_handle->p_scene_dispatcher, p_cache_data->current_scene_id);
+            p_app_handle->data_focus_index = p_cache_data->data_focus_index;
+            p_app_handle->data_scroll_offset = p_cache_data->data_scroll_offset;
+            memcpy(p_app_handle->game_focus_path, p_cache_data->game_focus_path, sizeof(p_app_handle->game_focus_path));
+            memcpy(p_app_handle->game_scroll_path, p_cache_data->game_scroll_path, sizeof(p_app_handle->game_scroll_path));
+            uint32_t scene_id = p_cache_data->current_scene_id;
+            if (scene_id == AMIIDB_SCENE_AMIIBO_DETAIL) {
+                scene_id = p_cache_data->prev_scene_id;
+            }
+            if (scene_id >= AMIIDB_SCENE_MAX) {
+                scene_id = AMIIDB_SCENE_MAIN;
+            }
+            if (scene_id != AMIIDB_SCENE_MAIN) {
+                mui_scene_dispatcher_next_scene(p_app_handle->p_scene_dispatcher, AMIIDB_SCENE_MAIN);
+            }
+            mui_scene_dispatcher_next_scene(p_app_handle->p_scene_dispatcher, scene_id);
 
         } else {
             mui_scene_dispatcher_next_scene(p_app_handle->p_scene_dispatcher, AMIIDB_SCENE_MAIN);
@@ -109,7 +123,7 @@ void app_amiidb_on_kill(mini_app_inst_t *p_app_inst) {
 
     uint32_t current_scene_id = mui_scene_dispatcher_current_scene(p_app_handle->p_scene_dispatcher);
 
-    if (app_amiidb_info.hibernate_enabled) {
+    if (p_app_inst->p_retain_data) {
         app_amiidb_cache_data_t p_cache_data = {0};
         p_cache_data.cached_enabled = true;
         memcpy(p_cache_data.game_id_path, p_app_handle->game_id_path, sizeof(p_app_handle->game_id_path));
@@ -118,10 +132,17 @@ void app_amiidb_on_kill(mini_app_inst_t *p_app_inst) {
         p_cache_data.current_scene_id = current_scene_id;
         p_cache_data.current_focus_index = mui_list_view_get_focus(p_app_handle->p_list_view);
         p_cache_data.cur_scroll_offset = mui_list_view_get_scroll_offset(p_app_handle->p_list_view);
+        p_cache_data.data_focus_index = p_app_handle->data_focus_index;
+        p_cache_data.data_scroll_offset = p_app_handle->data_scroll_offset;
+        memcpy(p_cache_data.game_focus_path, p_app_handle->game_focus_path, sizeof(p_cache_data.game_focus_path));
+        memcpy(p_cache_data.game_scroll_path, p_app_handle->game_scroll_path, sizeof(p_cache_data.game_scroll_path));
+        if (current_scene_id == AMIIDB_SCENE_DATA_LIST) {
+            p_cache_data.data_focus_index = p_cache_data.current_focus_index;
+            p_cache_data.data_scroll_offset = p_cache_data.cur_scroll_offset;
+        }
 
         memcpy(p_app_inst->p_retain_data, &p_cache_data, sizeof(app_amiidb_cache_data_t));
     } else {
-        memset(p_app_inst->p_retain_data, 0, CACHEDATASIZE);
         memset(&(cache_get_data()->ntag), 0, sizeof(ntag_t));
     }
 
@@ -154,7 +175,7 @@ const mini_app_t app_amiidb_info = {.id = MINI_APP_ID_AMIIDB,
                                     .icon = 0xe0ba,
                                     .sys = false,
                                     .deamon = false,
-                                    .hibernate_enabled = false,
+                                    .hibernate_enabled = true,
                                     .icon_32x32 = &app_amiibo_database_32x32,
                                     .run_cb = app_amiidb_on_run,
                                     .kill_cb = app_amiidb_on_kill,
