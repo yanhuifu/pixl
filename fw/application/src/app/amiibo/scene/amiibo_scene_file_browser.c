@@ -69,21 +69,21 @@ static void amiibo_scene_file_browser_reload_folders(app_amiibo_t *app) {
     mui_view_dispatcher_switch_to_view(app->p_view_dispatcher, AMIIBO_VIEW_ID_LIST);
 }
 
-static bool amiibo_scene_file_browser_back_handler(void *user_data) {
+static bool amiibo_scene_file_browser_go_parent(void *user_data) {
     app_amiibo_t *app = user_data;
-    if (string_cmp_str(app->current_folder, "/") != 0) {
-        /* Not at root directory -> navigate up one level. */
-        struct cwk_segment segment;
-        const char *folder_cstr = string_get_cstr(app->current_folder);
-        cwk_path_get_last_segment(folder_cstr, &segment);
-        string_left(app->current_folder, segment.begin - folder_cstr);
-        if (string_size(app->current_folder) == 0) {
-            string_cat_str(app->current_folder, "/");
-        }
-        amiibo_scene_file_browser_reload_folders(app);
-        return true;
+    if (string_cmp_str(app->current_folder, "/") == 0) {
+        return false;
     }
-    return false;
+
+    struct cwk_segment segment;
+    const char *folder_cstr = string_get_cstr(app->current_folder);
+    cwk_path_get_last_segment(folder_cstr, &segment);
+    string_left(app->current_folder, segment.begin - folder_cstr);
+    if (string_size(app->current_folder) == 0) {
+        string_cat_str(app->current_folder, "/");
+    }
+    amiibo_scene_file_browser_reload_folders(app);
+    return true;
 }
 
 static void amiibo_scene_file_browser_on_selected(mui_list_view_event_t event, mui_list_view_t *p_list_view,
@@ -98,14 +98,7 @@ static void amiibo_scene_file_browser_on_selected(mui_list_view_event_t event, m
             if (string_cmp_str(app->current_folder, "/") == 0) {
                 mini_app_launcher_kill(mini_app_launcher(), MINI_APP_ID_AMIIBO);
             } else {
-                struct cwk_segment segment;
-                const char *folder_cstr = string_get_cstr(app->current_folder);
-                cwk_path_get_last_segment(folder_cstr, &segment);
-                string_left(app->current_folder, segment.begin - folder_cstr);
-                if (string_size(app->current_folder) == 0) {
-                    string_cat_str(app->current_folder, "/");
-                }
-                amiibo_scene_file_browser_reload_folders(app);
+                amiibo_scene_file_browser_go_parent(app);
             }
         } else {
             if (p_item->icon == ICON_FOLDER) {
@@ -128,6 +121,7 @@ static void amiibo_scene_file_browser_on_selected(mui_list_view_event_t event, m
 
 void amiibo_scene_file_browser_on_enter(void *user_data) {
     app_amiibo_t *app = user_data;
+    mui_scene_dispatcher_set_back_cb(app->p_scene_dispatcher, amiibo_scene_file_browser_go_parent);
     NRF_LOG_INFO("%X", app);
     mui_list_view_set_selected_cb(app->p_list_view, amiibo_scene_file_browser_on_selected);
     mui_list_view_set_user_data(app->p_list_view, app);
@@ -136,14 +130,13 @@ void amiibo_scene_file_browser_on_enter(void *user_data) {
 
     mui_list_view_set_focus(app->p_list_view, app->current_focus_index);
 
-    mui_scene_dispatcher_set_back_handler(app->p_scene_dispatcher, amiibo_scene_file_browser_back_handler);
     NRF_LOG_INFO("%X", app);
 }
 
 void amiibo_scene_file_browser_on_exit(void *user_data) {
     app_amiibo_t *app = user_data;
+    mui_scene_dispatcher_set_back_cb(app->p_scene_dispatcher, NULL);
     mui_list_view_set_selected_cb(app->p_list_view, NULL);
     mui_list_view_set_user_data(app->p_list_view, NULL);
     mui_list_view_clear_items(app->p_list_view);
-    mui_scene_dispatcher_set_back_handler(app->p_scene_dispatcher, NULL);
 }
