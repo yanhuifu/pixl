@@ -4,6 +4,7 @@
 #include "mui_common.h"
 typedef void (*mui_scene_enter_cb_t)(void *user_data);
 typedef void (*mui_scene_exit_cb_t)(void *user_data);
+typedef bool (*mui_scene_back_cb_t)(void *user_data);
 
 ARRAY_DEF(scene_id_stack, uint32_t, M_DEFAULT_OPLIST);
 
@@ -18,6 +19,7 @@ typedef struct {
     const mui_scene_t *p_scene_defines;
     uint32_t scene_num;
     uint32_t default_scene_id;
+    mui_scene_back_cb_t back_cb;
     scene_id_stack_t scene_id_stack;
 } mui_scene_dispatcher_t;
 
@@ -28,6 +30,7 @@ void mui_scene_dispatcher_exit(mui_scene_dispatcher_t* p_dispatcher);
 void mui_scene_dispatcher_set_scene_defines(mui_scene_dispatcher_t *p_dispatcher, const mui_scene_t *p_scene_defines,
                                             uint32_t scene_num);
 void mui_scene_dispatcher_set_user_data(mui_scene_dispatcher_t *p_dispatcher, void *user_data);
+void mui_scene_dispatcher_set_back_cb(mui_scene_dispatcher_t *p_dispatcher, mui_scene_back_cb_t back_cb);
 void mui_scene_dispatcher_next_scene(mui_scene_dispatcher_t *p_dispatcher, uint32_t scene_id);
 void mui_scene_dispatcher_previous_scene(mui_scene_dispatcher_t *p_dispatcher);
 // Returns true if an active scene was moved back one level.

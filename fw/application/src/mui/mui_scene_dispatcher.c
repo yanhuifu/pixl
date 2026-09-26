@@ -3,6 +3,10 @@
 static mui_scene_dispatcher_t *active_scene_dispatcher;
 
 bool mui_scene_dispatcher_back_active_scene(void) {
+    if (active_scene_dispatcher && active_scene_dispatcher->back_cb &&
+        active_scene_dispatcher->back_cb(active_scene_dispatcher->user_data)) {
+        return true;
+    }
     if (active_scene_dispatcher &&
         scene_id_stack_size(active_scene_dispatcher->scene_id_stack) > 1) {
         mui_scene_dispatcher_previous_scene(active_scene_dispatcher);
@@ -18,6 +22,7 @@ mui_scene_dispatcher_t *mui_scene_dispatcher_create() {
     p_dispatcher->scene_num = 0;
     p_dispatcher->user_data = NULL;
     p_dispatcher->default_scene_id = 0;
+    p_dispatcher->back_cb = NULL;
     active_scene_dispatcher = p_dispatcher;
     return p_dispatcher;
 }
@@ -51,6 +56,10 @@ void mui_scene_dispatcher_set_scene_defines(mui_scene_dispatcher_t *p_dispatcher
 
 void mui_scene_dispatcher_set_user_data(mui_scene_dispatcher_t *p_dispatcher, void *user_data) {
     p_dispatcher->user_data = user_data;
+}
+
+void mui_scene_dispatcher_set_back_cb(mui_scene_dispatcher_t *p_dispatcher, mui_scene_back_cb_t back_cb) {
+    p_dispatcher->back_cb = back_cb;
 }
 
 void mui_scene_dispatcher_next_scene(mui_scene_dispatcher_t *p_dispatcher, uint32_t scene_id) {

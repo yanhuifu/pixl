@@ -11,6 +11,16 @@
 
 static void amiidb_scene_game_list_reload(app_amiidb_t *app);
 
+static bool amiidb_scene_game_list_back(void *user_data) {
+    app_amiidb_t *app = user_data;
+    if (app->game_id_index == 0) {
+        return false;
+    }
+    app->game_id_index--;
+    amiidb_scene_game_list_reload(app);
+    return true;
+}
+
 static void amiidb_scene_game_list_list_view_on_selected(mui_list_view_event_t event, mui_list_view_t *p_list_view,
                                                          mui_list_item_t *p_item) {
     uint16_t icon = p_item->icon;
@@ -20,8 +30,7 @@ static void amiidb_scene_game_list_list_view_on_selected(mui_list_view_event_t e
         if (app->game_id_index <= 0) {
             mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIDB_SCENE_MAIN);
         } else {
-            app->game_id_index--;
-            amiidb_scene_game_list_reload(app);
+            amiidb_scene_game_list_back(app);
         }
         break;
 
@@ -122,6 +131,7 @@ static void amiidb_scene_game_list_reload(app_amiidb_t *app) {
 
 void amiidb_scene_game_list_on_enter(void *user_data) {
     app_amiidb_t *app = (app_amiidb_t *)user_data;
+    mui_scene_dispatcher_set_back_cb(app->p_scene_dispatcher, amiidb_scene_game_list_back);
     amiidb_scene_game_list_reload(app);
 
     // restore states
@@ -131,5 +141,6 @@ void amiidb_scene_game_list_on_enter(void *user_data) {
 
 void amiidb_scene_game_list_on_exit(void *user_data) {
     app_amiidb_t *app = (app_amiidb_t *)user_data;
+    mui_scene_dispatcher_set_back_cb(app->p_scene_dispatcher, NULL);
     mui_list_view_clear_items(app->p_list_view);
 }
