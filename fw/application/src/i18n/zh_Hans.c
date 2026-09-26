@@ -26,6 +26,7 @@ const char * const lang_zh_Hans[_L_COUNT] = {
     [_L_APP_SET_LIPO_BAT] = "LiPO电池",
     [_L_APP_SET_SHOW_MEM_USAGE] = "内存使用率",
     [_L_APP_SET_HIBERNATE] = "快速唤醒",
+    [_L_APP_SET_UI_MEMORY] = "界面记忆",
     [_L_APP_SET_SLEEP_TIMEOUT] = "休眠时间",
     [_L_APP_SET_LANGUAGE] = "系统语言",
     [_L_APP_SET_GO_SLEEP] = "进入休眠",

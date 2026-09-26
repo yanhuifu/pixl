@@ -17,7 +17,7 @@ typedef struct {
     uint32_t settings_version; // must be the FIRST field; used to detect old/incompatible settings
     bool backlight; // deprecated, keep for capability issue
     uint8_t sleep_timeout_sec;
-    bool dirty;
+    bool ui_memory_enabled; // reuses the previously unused dirty field without changing settings layout
     bool auto_gen_amiibo;
     bool auto_gen_amiibolink; // deprecated, keep for capability issue
     bool skip_driver_select;

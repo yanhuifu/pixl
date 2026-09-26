@@ -26,6 +26,7 @@ const settings_data_t def_settings_data = {.settings_version = SETTINGS_DATA_VER
                                            .amiibo_link_ver = BLE_AMIIBOLINK_VER_V1,
                                            .language = LANGUAGE_ZH_HANS,
                                            .hibernate_enabled = false,
+                                           .ui_memory_enabled = false,
                                            .show_mem_usage = false,
                                            .lcd_backlight = 50,
                                            .oled_contrast = 90,
@@ -65,6 +66,7 @@ static void validate_settings() {
     BOOL_VALIDATE(m_settings_data.skip_driver_select, 0);
     BOOL_VALIDATE(m_settings_data.show_mem_usage, 0);
     BOOL_VALIDATE(m_settings_data.hibernate_enabled, 0);
+    BOOL_VALIDATE(m_settings_data.ui_memory_enabled, 0);
     BOOL_VALIDATE(m_settings_data.bat_mode, 0);
     BOOL_VALIDATE(m_settings_data.skip_driver_select, 0);
     BOOL_VALIDATE(m_settings_data.auto_gen_amiibo, 0);

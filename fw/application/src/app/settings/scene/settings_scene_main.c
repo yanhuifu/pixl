@@ -14,6 +14,7 @@ enum settings_main_menu_t {
     SETTINGS_MAIN_MENU_OLED_CONTRAST,
     SETTINGS_MAIN_MENU_LI_MODE,
     SETTINGS_MAIN_MENU_ENABLE_HIBERNATE,
+    SETTINGS_MAIN_MENU_UI_MEMORY,
     SETTINGS_MAIN_MENU_STORAGE,
     SETTINGS_MAIN_MENU_LANGUAGE,
     SETTINGS_MAIN_MENU_SHOW_MEM_USAGE,
@@ -107,6 +108,16 @@ static void settings_scene_main_list_view_on_selected(mui_list_view_event_t even
 
     case SETTINGS_MAIN_MENU_ENABLE_HIBERNATE:
         p_settings->hibernate_enabled = !p_settings->hibernate_enabled;
+        if (p_settings->hibernate_enabled) {
+            p_settings->ui_memory_enabled = true;
+        }
+        settings_scene_main_reload(app);
+        break;
+
+    case SETTINGS_MAIN_MENU_UI_MEMORY:
+        p_settings->ui_memory_enabled = !p_settings->ui_memory_enabled;
+        p_settings->hibernate_enabled = p_settings->ui_memory_enabled;
+        settings_save();
         settings_scene_main_reload(app);
         break;
 
@@ -201,6 +212,9 @@ static void settings_scene_main_reload(void *user_data) {
     mui_list_view_add_item_ext(app->p_list_view, 0xe232, _T(APP_SET_HIBERNATE),
                                p_settings->hibernate_enabled ? _T(ON_F) : _T(OFF_F),
                                (void *)SETTINGS_MAIN_MENU_ENABLE_HIBERNATE);
+    mui_list_view_add_item_ext(app->p_list_view, 0xe232, _T(APP_SET_UI_MEMORY),
+                               p_settings->ui_memory_enabled ? _T(ON_F) : _T(OFF_F),
+                               (void *)SETTINGS_MAIN_MENU_UI_MEMORY);
 
     if (nrf_pwr_mgmt_get_timeout() == 0) {
         snprintf(txt, sizeof(txt), "%s", getLangString(_L_OFF_F));

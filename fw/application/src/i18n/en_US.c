@@ -26,6 +26,7 @@ const char * const lang_en_US[_L_COUNT] = {
     [_L_APP_SET_LIPO_BAT] = "LiPO Battery",
     [_L_APP_SET_SHOW_MEM_USAGE] = "Memory Used",
     [_L_APP_SET_HIBERNATE] = "Fast Wakeup",
+    [_L_APP_SET_UI_MEMORY] = "Remember Screen",
     [_L_APP_SET_SLEEP_TIMEOUT] = "Sleep Timeout",
     [_L_APP_SET_LANGUAGE] = "Language",
     [_L_APP_SET_GO_SLEEP] = "Go Sleep",

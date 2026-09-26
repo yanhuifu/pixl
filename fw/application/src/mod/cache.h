@@ -12,6 +12,7 @@ typedef struct {
     uint32_t id;
     ntag_t ntag;
     uint8_t retain_data[CACHEDATASIZE];
+    uint8_t desktop_focus;
 } cache_data_t;
 
 int32_t cache_clean();

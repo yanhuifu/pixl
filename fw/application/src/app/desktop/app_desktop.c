@@ -8,6 +8,7 @@
 #include "mini_app_launcher.h"
 
 #include "settings.h"
+#include "cache.h"
 
 typedef enum { DESKTOP_VIEW_ID_MAIN } desktop_view_id_t;
 
@@ -46,14 +47,28 @@ void app_desktop_on_run(mini_app_inst_t *p_app_inst) {
 
     app_list_view_set_event_cb(p_app_handle->p_app_list_view, app_desktop_list_view_on_selected);
 
+    cache_data_t *p_cache = cache_get_data();
+    if (p_settings->ui_memory_enabled &&
+        p_cache->desktop_focus < ptr_array_size(p_app_handle->p_app_list_view->items)) {
+        p_app_handle->p_app_list_view->focus = p_cache->desktop_focus;
+    }
+
     mui_view_dispatcher_add_view(p_app_handle->p_view_dispatcher, DESKTOP_VIEW_ID_MAIN,
                                  app_list_view_get_view(p_app_handle->p_app_list_view));
     mui_view_dispatcher_attach(p_app_handle->p_view_dispatcher, MUI_LAYER_WINDOW);
     mui_view_dispatcher_switch_to_view(p_app_handle->p_view_dispatcher, DESKTOP_VIEW_ID_MAIN);
 }
 
+void app_desktop_save_focus(mini_app_inst_t *p_app_inst) {
+    if (p_app_inst && p_app_inst->p_handle) {
+        app_desktop_t *app = p_app_inst->p_handle;
+        cache_get_data()->desktop_focus = app_list_view_get_focus(app->p_app_list_view);
+    }
+}
+
 void app_desktop_on_kill(mini_app_inst_t *p_app_inst) {
     app_desktop_t *p_app_handle = p_app_inst->p_handle;
+    app_desktop_save_focus(p_app_inst);
 
     mui_view_dispatcher_switch_to_view(p_app_handle->p_view_dispatcher, VIEW_NONE);
     mui_view_dispatcher_detach(p_app_handle->p_view_dispatcher, MUI_LAYER_WINDOW);
