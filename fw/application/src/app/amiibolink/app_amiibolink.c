@@ -78,12 +78,19 @@ void app_amiibolink_on_kill(mini_app_inst_t *p_app_inst) {
 
     app_amiibolink_retain_data_t *p_retain = (app_amiibolink_retain_data_t *)p_app_inst->p_retain_data;
 
-    p_retain->amiibolink_mode = p_app_handle->amiibolink_mode;
-    p_retain->cycle_mode_index = amiibolink_view_get_index(p_app_handle->p_amiibolink_view);
+    if (p_retain) {
+        p_retain->amiibolink_mode = p_app_handle->amiibolink_mode;
+        p_retain->cycle_mode_index = amiibolink_view_get_index(p_app_handle->p_amiibolink_view);
+    }
+
+    // The global back action kills the app without first leaving its scene.
+    // Run the scene's exit callback to stop advertising and clear callbacks.
+    mui_scene_dispatcher_exit(p_app_handle->p_scene_dispatcher);
 
     mui_view_dispatcher_detach(p_app_handle->p_view_dispatcher, MUI_LAYER_FULLSCREEN);
     mui_view_dispatcher_free(p_app_handle->p_view_dispatcher);
     mui_list_view_free(p_app_handle->p_list_view);
+    mui_msg_box_free(p_app_handle->p_msg_box);
     amiibolink_view_free(p_app_handle->p_amiibolink_view);
     mui_scene_dispatcher_free(p_app_handle->p_scene_dispatcher);
 
