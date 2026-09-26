@@ -36,7 +36,7 @@ static void amiidb_scene_fav_list_list_view_on_selected(mui_list_view_event_t ev
         case ICON_EXIT:
             if (string_size(app->cur_fav_dir) == 0) {
                 app->in_fav_folders = true;
-                mui_scene_dispatcher_previous_scene(app->p_scene_dispatcher);
+                mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIDB_SCENE_MAIN);
             } else {
                 string_reset(app->cur_fav_dir);
                 app->in_fav_folders = false;
@@ -140,25 +140,12 @@ void amiidb_scene_fav_list_item_clear_cb(mui_list_item_t *p_item) {
     }
 }
 
-static bool amiidb_scene_fav_list_back_handler(void *user_data) {
-    app_amiidb_t *app = (app_amiidb_t *)user_data;
-    if (string_size(app->cur_fav_dir) > 0) {
-        string_reset(app->cur_fav_dir);
-        app->in_fav_folders = false;
-        amiidb_scene_fav_list_reload(app);
-        return true;
-    }
-    return false;
-}
-
 void amiidb_scene_fav_list_on_enter(void *user_data) {
     app_amiidb_t *app = (app_amiidb_t *)user_data;
     amiidb_scene_fav_list_reload(app);
-    mui_scene_dispatcher_set_back_handler(app->p_scene_dispatcher, amiidb_scene_fav_list_back_handler);
 }
 
 void amiidb_scene_fav_list_on_exit(void *user_data) {
     app_amiidb_t *app = (app_amiidb_t *)user_data;
     mui_list_view_clear_items_with_cb(app->p_list_view, amiidb_scene_fav_list_item_clear_cb);
-    mui_scene_dispatcher_set_back_handler(app->p_scene_dispatcher, NULL);
 }

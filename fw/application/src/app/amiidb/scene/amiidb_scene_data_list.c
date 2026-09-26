@@ -22,7 +22,7 @@ static void amiidb_scene_data_list_list_view_on_selected(mui_list_view_event_t e
     if (event == MUI_LIST_VIEW_EVENT_SELECTED) {
         switch (icon) {
         case ICON_EXIT: {
-            mui_scene_dispatcher_previous_scene(app->p_scene_dispatcher);
+            mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIDB_SCENE_MAIN);
         } break;
 
         case ICON_AMIIBO:

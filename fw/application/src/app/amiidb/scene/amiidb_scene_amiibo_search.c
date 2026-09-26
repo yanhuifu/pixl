@@ -45,7 +45,7 @@ static void amiidb_scene_amiibo_search_list_view_on_selected(mui_list_view_event
     switch (icon) {
     case ICON_EXIT:
         if (app->game_id_index <= 0) {
-            mui_scene_dispatcher_previous_scene(app->p_scene_dispatcher);
+            mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIDB_SCENE_MAIN);
         } else {
             app->game_id_index--;
             amiidb_scene_amiibo_search_reload(app);
@@ -113,24 +113,12 @@ static void amiidb_scene_amiibo_search_reload(app_amiidb_t *app) {
     mui_view_dispatcher_switch_to_view(app->p_view_dispatcher, AMIIDB_VIEW_ID_LIST);
 }
 
-static bool amiidb_scene_amiibo_search_back_handler(void *user_data) {
-    app_amiidb_t *app = (app_amiidb_t *)user_data;
-    if (app->game_id_index > 0) {
-        app->game_id_index--;
-        amiidb_scene_amiibo_search_reload(app);
-        return true;
-    }
-    return false;
-}
-
 void amiidb_scene_amiibo_search_on_enter(void *user_data) {
     app_amiidb_t *app = (app_amiidb_t *)user_data;
     amiidb_scene_amiibo_search_reload(app);
-    mui_scene_dispatcher_set_back_handler(app->p_scene_dispatcher, amiidb_scene_amiibo_search_back_handler);
 }
 
 void amiidb_scene_amiibo_search_on_exit(void *user_data) {
     app_amiidb_t *app = (app_amiidb_t *)user_data;
     mui_list_view_clear_items(app->p_list_view);
-    mui_scene_dispatcher_set_back_handler(app->p_scene_dispatcher, NULL);
 }

@@ -29,7 +29,7 @@ enum file_browser_menu_t {
 
 static void amiibo_scene_scene_file_browser_menu_msg_box_error_cb(mui_msg_box_event_t event, mui_msg_box_t *p_msg_box) {
     app_amiibo_t *app = p_msg_box->user_data;
-    mui_scene_dispatcher_previous_scene(app->p_scene_dispatcher);
+    mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIBO_SCENE_FILE_BROWSER);
 }
 
 static void amiibo_scene_file_browser_show_messege(app_amiibo_t *app, const char *msg) {
@@ -53,7 +53,7 @@ static void amiibo_scene_file_browser_text_input_create_folder_event_cb(mui_text
             cwalk_append_segment(path, string_get_cstr(app->current_folder), input_text);
             int32_t res = p_driver->create_dir(path);
             if (res == VFS_OK) {
-                mui_scene_dispatcher_previous_scene(app->p_scene_dispatcher);
+                mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIBO_SCENE_FILE_BROWSER);
             }
         } else {
             mui_scene_dispatcher_previous_scene(app->p_scene_dispatcher);
@@ -75,7 +75,7 @@ static void amiibo_scene_file_browser_text_input_create_amiibo_event_cb(mui_text
             ntag_store_new_rand(&ntag);
             int32_t res = p_driver->write_file_data(path, ntag.data, _ntag_data_size(&ntag));
             if (res > 0) {
-                mui_scene_dispatcher_previous_scene(app->p_scene_dispatcher);
+                mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIBO_SCENE_FILE_BROWSER);
             }
         } else {
             mui_scene_dispatcher_previous_scene(app->p_scene_dispatcher);
@@ -134,7 +134,7 @@ static void amiibo_scene_file_browser_text_input_create_amiibo_batch_event_cb(mu
             }
         }
 
-        mui_scene_dispatcher_previous_scene(app->p_scene_dispatcher);
+        mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIBO_SCENE_FILE_BROWSER);
     }
 }
 
@@ -171,7 +171,7 @@ static void amiibo_scene_file_browser_menu_text_input_rename_folder_event_cb(mui
         }
 
         if (renamed) {
-            mui_scene_dispatcher_previous_scene(app->p_scene_dispatcher);
+            mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIBO_SCENE_FILE_BROWSER);
         } else {
             char msg[32];
             sprintf(msg, "%s\n%s:%d", getLangString(_L_RENAME_FAILED), getLangString(_L_ERR_CODE), res);
