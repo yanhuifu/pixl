@@ -30,6 +30,8 @@ void mui_scene_dispatcher_set_scene_defines(mui_scene_dispatcher_t *p_dispatcher
 void mui_scene_dispatcher_set_user_data(mui_scene_dispatcher_t *p_dispatcher, void *user_data);
 void mui_scene_dispatcher_next_scene(mui_scene_dispatcher_t *p_dispatcher, uint32_t scene_id);
 void mui_scene_dispatcher_previous_scene(mui_scene_dispatcher_t *p_dispatcher);
+// Returns true if an active scene was moved back one level.
+bool mui_scene_dispatcher_back_active_scene(void);
 void mui_scene_dispatcher_back_scene(mui_scene_dispatcher_t *p_dispatcher, uint32_t step);
 
 uint32_t mui_scene_dispatcher_current_scene(mui_scene_dispatcher_t *p_dispatcher);

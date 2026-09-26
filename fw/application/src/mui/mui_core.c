@@ -4,6 +4,9 @@
 #include "mui_u8g2.h"
 #include "nrf_log.h"
 #include "settings.h"
+#include "mui_scene_dispatcher.h"
+#include "mini_app_launcher.h"
+#include "mini_app_registry.h"
 
 static mui_view_port_t *mui_find_view_port_enabled(mui_t *p_mui, mui_layer_t layer) {
     mui_view_port_array_it_t it;
@@ -99,6 +102,19 @@ static void mui_process_input(mui_t *p_mui, mui_event_t *p_event) {
 
         input_event.key = arg & 0xFF;
         input_event.type = (arg >> 8) & 0xFF;
+
+        if (input_event.key == INPUT_KEY_CENTER &&
+            (input_event.type == INPUT_TYPE_LONG || input_event.type == INPUT_TYPE_REPEAT)) {
+            if (input_event.type == INPUT_TYPE_LONG &&
+                !mui_scene_dispatcher_back_active_scene()) {
+                mini_app_launcher_t *launcher = mini_app_launcher();
+                if (launcher->p_main_app_inst &&
+                    launcher->p_main_app_inst->p_app->id != MINI_APP_ID_DESKTOP) {
+                    mini_app_launcher_exit(launcher);
+                }
+            }
+            return;
+        }
 
         p_view_port->input_cb(p_view_port, &input_event);
 
