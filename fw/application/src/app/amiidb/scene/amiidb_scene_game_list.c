@@ -11,6 +11,14 @@
 
 static void amiidb_scene_game_list_reload(app_amiidb_t *app);
 
+static void amiidb_scene_game_list_restore_position(app_amiidb_t *app) {
+    uint8_t depth = app->game_id_index;
+    if (app->game_focus_path[depth] < mui_list_view_item_size(app->p_list_view)) {
+        mui_list_view_set_focus(app->p_list_view, app->game_focus_path[depth]);
+        mui_list_view_set_scroll_offset(app->p_list_view, app->game_scroll_path[depth]);
+    }
+}
+
 static bool amiidb_scene_game_list_back(void *user_data) {
     app_amiidb_t *app = user_data;
     if (app->game_id_index == 0) {
@@ -18,6 +26,7 @@ static bool amiidb_scene_game_list_back(void *user_data) {
     }
     app->game_id_index--;
     amiidb_scene_game_list_reload(app);
+    amiidb_scene_game_list_restore_position(app);
     return true;
 }
 
@@ -36,7 +45,14 @@ static void amiidb_scene_game_list_list_view_on_selected(mui_list_view_event_t e
 
     case ICON_FOLDER: {
         const db_game_t *p_game = p_item->user_data;
+        if (app->game_id_index + 1 >= sizeof(app->game_id_path) / sizeof(app->game_id_path[0])) {
+            break;
+        }
+        app->game_focus_path[app->game_id_index] = mui_list_view_get_focus(p_list_view);
+        app->game_scroll_path[app->game_id_index] = mui_list_view_get_scroll_offset(p_list_view);
         app->game_id_path[++app->game_id_index] = p_game->game_id;
+        app->game_focus_path[app->game_id_index] = 0;
+        app->game_scroll_path[app->game_id_index] = 0;
         amiidb_scene_game_list_reload(app);
     } break;
 
@@ -133,14 +149,13 @@ void amiidb_scene_game_list_on_enter(void *user_data) {
     app_amiidb_t *app = (app_amiidb_t *)user_data;
     mui_scene_dispatcher_set_back_cb(app->p_scene_dispatcher, amiidb_scene_game_list_back);
     amiidb_scene_game_list_reload(app);
-
-    // restore states
-    mui_list_view_set_focus(app->p_list_view, app->cur_focus_index);
-    mui_list_view_set_scroll_offset(app->p_list_view, app->cur_scroll_offset);
+    amiidb_scene_game_list_restore_position(app);
 }
 
 void amiidb_scene_game_list_on_exit(void *user_data) {
     app_amiidb_t *app = (app_amiidb_t *)user_data;
+    app->game_focus_path[app->game_id_index] = mui_list_view_get_focus(app->p_list_view);
+    app->game_scroll_path[app->game_id_index] = mui_list_view_get_scroll_offset(app->p_list_view);
     mui_scene_dispatcher_set_back_cb(app->p_scene_dispatcher, NULL);
     mui_list_view_clear_items(app->p_list_view);
 }

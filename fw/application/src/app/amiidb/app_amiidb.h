@@ -46,6 +46,8 @@ typedef struct {
     const db_amiibo_t * cur_amiibo;
     uint16_t game_id_path[8];
     uint8_t game_id_index;
+    uint16_t game_focus_path[8];
+    uint16_t game_scroll_path[8];
 
     /** fav list*/
     string_t cur_fav_dir;
@@ -54,6 +56,8 @@ typedef struct {
 
     /** data slot */
     uint8_t cur_slot_index;
+    uint16_t data_focus_index;
+    uint16_t data_scroll_offset;
 
     uint8_t cur_focus_index;
     uint16_t cur_scroll_offset;

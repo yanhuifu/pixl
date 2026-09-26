@@ -77,9 +77,15 @@ void amiidb_scene_data_list_on_enter(void *user_data) {
     app_amiidb_t *app = (app_amiidb_t *)user_data;
     amiidb_scene_data_list_reload(app);
     amiidb_scene_data_list_setup(app);
+    if (app->data_focus_index < mui_list_view_item_size(app->p_list_view)) {
+        mui_list_view_set_focus(app->p_list_view, app->data_focus_index);
+        mui_list_view_set_scroll_offset(app->p_list_view, app->data_scroll_offset);
+    }
 }
 
 void amiidb_scene_data_list_on_exit(void *user_data) {
     app_amiidb_t *app = (app_amiidb_t *)user_data;
+    app->data_focus_index = mui_list_view_get_focus(app->p_list_view);
+    app->data_scroll_offset = mui_list_view_get_scroll_offset(app->p_list_view);
     mui_list_view_clear_items(app->p_list_view);
 }
