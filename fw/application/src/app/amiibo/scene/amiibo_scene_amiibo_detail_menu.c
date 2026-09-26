@@ -104,7 +104,7 @@ static void amiibo_scene_amiibo_detail_delete_tag_confirmed(mui_msg_box_event_t 
                 app->reload_amiibo_files = true;
                 mui_scene_dispatcher_previous_scene(app->p_scene_dispatcher);
             } else {
-                mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIBO_SCENE_FILE_BROWSER);
+                mui_scene_dispatcher_back_scene(app->p_scene_dispatcher, 2);
             }
         }
     } else {
@@ -175,7 +175,7 @@ static void amiibo_scene_amiibo_detail_menu_on_selected(mui_list_view_event_t ev
 
     switch (selection) {
     case AMIIBO_DETAIL_MENU_BACK_FILE_BROWSER:
-        mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIBO_SCENE_FILE_BROWSER);
+        mui_scene_dispatcher_back_scene(app->p_scene_dispatcher, 2);
         break;
     case AMIIBO_DETAIL_MENU_RAND_UID: {
         ret_code_t err_code;

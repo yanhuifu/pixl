@@ -9,8 +9,14 @@
 typedef enum { BTN_STATE_IDLE, BTN_STATE_PRESSED, BTN_STATE_LONG_PRESSED, BTN_STATE_REPEAT } btn_state_t;
 
 #define BSP_BUTTON_ACTION_REPEAT_PUSH (3)
-#define BSP_BUTTON_LONG_PUSH_TIMEOUT_MS (500)
+#define BSP_BUTTON_LONG_PUSH_TIMEOUT_MS (1000)
+#define BSP_BUTTON_CENTER_LONG_PUSH_TIMEOUT_MS (500)
 #define BSP_BUTTON_REPEAT_PUSH_TIMEOUT_MS (200)
+
+/* Button index 1 is the center button (INPUT_KEY_CENTER).
+ * The center button uses a shorter long-press timeout to trigger
+ * the global "back" action. */
+#define BSP_BTN_CENTER_IDX (1)
 
 typedef struct {
     uint8_t state;
@@ -59,7 +65,10 @@ static void bsp_button_event_handler(uint8_t pin_no, uint8_t button_action) {
 
         switch (m_bsp_btns[idx].state) {
         case BTN_STATE_IDLE:
-            err_code = app_timer_start(m_bsp_button_long_push_tmr, APP_TIMER_TICKS(BSP_BUTTON_LONG_PUSH_TIMEOUT_MS),
+            err_code = app_timer_start(m_bsp_button_long_push_tmr,
+                                       APP_TIMER_TICKS(idx == BSP_BTN_CENTER_IDX
+                                                           ? BSP_BUTTON_CENTER_LONG_PUSH_TIMEOUT_MS
+                                                           : BSP_BUTTON_LONG_PUSH_TIMEOUT_MS),
                                        (void *)&m_current_long_push_pin_no);
             if (err_code == NRF_SUCCESS) {
                 m_bsp_btns[idx].state = BTN_STATE_PRESSED;
@@ -97,12 +106,18 @@ static void bsp_button_event_handler(uint8_t pin_no, uint8_t button_action) {
     } else if (button_action == BSP_BUTTON_ACTION_LONG_PUSH) {
         bsp_button_callback(idx, BSP_BTN_EVENT_LONG);
 
-        // start repeat timer
-        err_code = app_timer_start(m_bsp_button_repeat_push_tmr, APP_TIMER_TICKS(BSP_BUTTON_REPEAT_PUSH_TIMEOUT_MS),
-                                   (void *)&m_current_long_push_pin_no);
-        if (err_code == NRF_SUCCESS) {
+        /* The center button's long-press triggers the global back action.
+         * Don't start the repeat timer for it, otherwise repeat events
+         * would leak into the new view after the scene/app switch. */
+        if (idx != BSP_BTN_CENTER_IDX) {
+            err_code = app_timer_start(m_bsp_button_repeat_push_tmr, APP_TIMER_TICKS(BSP_BUTTON_REPEAT_PUSH_TIMEOUT_MS),
+                                       (void *)&m_current_long_push_pin_no);
+            if (err_code == NRF_SUCCESS) {
+                m_bsp_btns[idx].state = BTN_STATE_LONG_PRESSED;
+                m_current_long_push_pin_no = pin_no;
+            }
+        } else {
             m_bsp_btns[idx].state = BTN_STATE_LONG_PRESSED;
-            m_current_long_push_pin_no = pin_no;
         }
 
     } else if (button_action == BSP_BUTTON_ACTION_REPEAT_PUSH) {

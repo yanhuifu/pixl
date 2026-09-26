@@ -22,7 +22,7 @@ static void amiibo_scene_amiibo_detail_reload_files(app_amiibo_t *app);
 
 static void amiibo_scene_amiibo_detail_msg_box_error_cb(mui_msg_box_event_t event, mui_msg_box_t *p_msg_box) {
     app_amiibo_t *app = p_msg_box->user_data;
-    mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIBO_SCENE_FILE_BROWSER);
+    mui_scene_dispatcher_previous_scene(app->p_scene_dispatcher);
 }
 
 static void amiibo_scene_amiibo_detail_reload_error(app_amiibo_t *app, const char *path, int32_t err_code) {

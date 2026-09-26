@@ -31,7 +31,7 @@ void amiibolink_scene_menu_on_event(mui_list_view_event_t event, mui_list_view_t
     char txt[32];
     if (event == MUI_LIST_VIEW_EVENT_SELECTED) {
         if (menu_code == AMIIBOLINK_MENU_BACK_MAIN) {
-            mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIBOLINK_SCENE_MAIN);
+            mui_scene_dispatcher_previous_scene(app->p_scene_dispatcher);
         } else if (menu_code == AMIIBOLINK_MENU_MODE) {
             mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIBOLINK_SCENE_MENU_MODE);
         } else if (menu_code == AMIIBOLINK_MENU_VER) {

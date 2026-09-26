@@ -112,3 +112,22 @@ void mini_app_launcher_sleep(mini_app_launcher_t *p_launcher) {
         }
     }
 }
+
+void mini_app_launcher_handle_back(mini_app_launcher_t *p_launcher, mui_scene_dispatcher_t *p_scene_dispatcher) {
+    if (p_scene_dispatcher && mui_scene_dispatcher_scene_stack_size(p_scene_dispatcher) > 1) {
+        /* Let the current scene handle back internally first (e.g. folder
+         * tree navigation).  If it returns false, pop the scene stack. */
+        mui_scene_dispatcher_handle_back(p_scene_dispatcher);
+    } else if (p_scene_dispatcher && mui_scene_dispatcher_scene_stack_size(p_scene_dispatcher) == 1) {
+        /* Stack has only the root scene.  Give the scene one more chance
+         * to handle internal navigation before we kill the app. */
+        if (!mui_scene_dispatcher_handle_back(p_scene_dispatcher)) {
+            /* Scene didn't handle it -> exit to desktop. */
+            if (p_launcher->p_main_app_inst) {
+                mini_app_launcher_kill(p_launcher, p_launcher->p_main_app_inst->p_app->id);
+            }
+        }
+    } else if (p_launcher->p_main_app_inst) {
+        mini_app_launcher_kill(p_launcher, p_launcher->p_main_app_inst->p_app->id);
+    }
+}

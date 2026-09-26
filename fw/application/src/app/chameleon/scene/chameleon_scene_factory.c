@@ -38,7 +38,7 @@ void chameleon_scene_factory_on_enter(void *user_data) {
 
     tag_emulation_change_slot(0, false);
 
-    mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, CHAMELEON_SCENE_MAIN);
+    mui_scene_dispatcher_previous_scene(app->p_scene_dispatcher);
 }
 
 void chameleon_scene_factory_on_exit(void *user_data) {}
