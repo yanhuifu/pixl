@@ -24,7 +24,6 @@
 #define MAX_NTAG_INDEX 26
 
 APP_TIMER_DEF(m_amiibo_gen_delay_timer);
-static bool m_amiibo_gen_delay_timer_created;
 
 static void amiibolink_scene_amiibo_detail_menu_msg_box_no_key_cb(mui_msg_box_event_t event, mui_msg_box_t *p_msg_box) {
     app_amiibolink_t *app = p_msg_box->user_data;
@@ -213,11 +212,8 @@ void amiibolink_scene_main_on_enter(void *user_data) {
 
     ntag_emu_set_update_cb(ntag_update_cb, app);
 
-    if (!m_amiibo_gen_delay_timer_created) {
-        int32_t err_code = app_timer_create(&m_amiibo_gen_delay_timer, APP_TIMER_MODE_SINGLE_SHOT, ntag_generate_cb);
-        APP_ERROR_CHECK(err_code);
-        m_amiibo_gen_delay_timer_created = true;
-    }
+    int32_t err_code = app_timer_create(&m_amiibo_gen_delay_timer, APP_TIMER_MODE_SINGLE_SHOT, ntag_generate_cb);
+    APP_ERROR_CHECK(err_code);
 
     amiibolink_scene_switch_mode(app, app->amiibolink_mode, amiibolink_view_get_index(app->p_amiibolink_view));
     amiibolink_view_set_event_cb(app->p_amiibolink_view, amiibolink_scene_main_event_cb);
@@ -227,8 +223,6 @@ void amiibolink_scene_main_on_enter(void *user_data) {
 void amiibolink_scene_main_on_exit(void *user_data) {
     app_amiibolink_t *app = user_data;
 
-    app_timer_stop(m_amiibo_gen_delay_timer);
-    ble_amiibolink_set_event_handler(NULL, NULL);
     ble_disable();
     ble_nus_set_handler(NULL, NULL);
     ntag_emu_set_update_cb(NULL, NULL);
