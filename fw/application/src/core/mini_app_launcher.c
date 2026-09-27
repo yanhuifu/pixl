@@ -86,14 +86,14 @@ void mini_app_launcher_init(mini_app_launcher_t *p_launcher, uint32_t wakeup_rea
     
     NRF_LOG_INFO("wakeup reason: %d", wakeup_reason);
 
-    if (!p_settings->ui_memory_enabled) {
-        mini_app_launcher_run_with_retain_data(p_launcher, MINI_APP_ID_DESKTOP, NULL);
-    } else if ((wakeup_reason & NRF_POWER_RESETREAS_NFC_MASK) && tag_helper_valid_default_slot()) {
+    if ((wakeup_reason & NRF_POWER_RESETREAS_NFC_MASK) && tag_helper_valid_default_slot()) {
         mini_app_launcher_run_with_retain_data(p_launcher, MINI_APP_ID_CHAMELEON, NULL);
-    } else if (p_cache->enabled == 1 && mini_app_registry_find_by_id(p_cache->id)) {
+    } else if (p_cache->enabled == 1 && mini_app_registry_find_by_id(p_cache->id) &&
+               (p_settings->ui_memory_enabled || p_settings->hibernate_enabled)) {
         mini_app_t *saved_app = mini_app_registry_find_by_id(p_cache->id);
         mini_app_launcher_run_with_retain_data(p_launcher, p_cache->id,
-                                               (saved_app->hibernate_enabled && p_settings->hibernate_enabled)
+                                               (saved_app->hibernate_enabled &&
+                                                (p_settings->ui_memory_enabled || p_settings->hibernate_enabled))
                                                    ? p_cache->retain_data : NULL);
     } else {
         mini_app_launcher_run_with_retain_data(p_launcher, MINI_APP_ID_DESKTOP, NULL);
@@ -113,12 +113,17 @@ void mini_app_launcher_sleep(mini_app_launcher_t *p_launcher) {
         if (p_settings->ui_memory_enabled) {
             p_cache->id = app->p_app->id;
             p_cache->enabled = true;
-            if (app->p_app->hibernate_enabled && p_settings->hibernate_enabled) {
+            if (app->p_app->hibernate_enabled) {
                 app->p_retain_data = p_cache->retain_data;
                 app->p_app->kill_cb(app);
             } else {
                 memset(p_cache->retain_data, 0, sizeof(p_cache->retain_data));
             }
+        } else if (p_settings->hibernate_enabled && app->p_app->hibernate_enabled) {
+            p_cache->id = app->p_app->id;
+            p_cache->enabled = true;
+            app->p_retain_data = p_cache->retain_data;
+            app->p_app->kill_cb(app);
         } else {
             p_cache->enabled = false;
             memset(p_cache->retain_data, 0, sizeof(p_cache->retain_data));

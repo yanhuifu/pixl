@@ -108,15 +108,12 @@ static void settings_scene_main_list_view_on_selected(mui_list_view_event_t even
 
     case SETTINGS_MAIN_MENU_ENABLE_HIBERNATE:
         p_settings->hibernate_enabled = !p_settings->hibernate_enabled;
-        if (p_settings->hibernate_enabled) {
-            p_settings->ui_memory_enabled = true;
-        }
+        settings_save();
         settings_scene_main_reload(app);
         break;
 
     case SETTINGS_MAIN_MENU_UI_MEMORY:
         p_settings->ui_memory_enabled = !p_settings->ui_memory_enabled;
-        p_settings->hibernate_enabled = p_settings->ui_memory_enabled;
         settings_save();
         settings_scene_main_reload(app);
         break;
