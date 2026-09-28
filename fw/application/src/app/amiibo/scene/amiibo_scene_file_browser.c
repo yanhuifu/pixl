@@ -10,6 +10,7 @@
 
 #include "i18n/language.h"
 #include "settings.h"
+#include <string.h>
 
 #define ICON_FOLDER 0xe1d6
 #define ICON_FILE 0xe1ed
@@ -18,6 +19,18 @@
 #define ICON_HOME 0xe1f0
 
 #define FOLDER_LIST_PARENT 0xFFFF
+#define FOLDER_PRAGMATA 0xFFFE
+#define FOLDER_MONSTER_HUNTER_STORIES_3 0xFFFD
+
+static const char *amiibo_scene_file_browser_folder_name(uint32_t item_id, const char *display_name) {
+    if (item_id == FOLDER_PRAGMATA) {
+        return "识质存在";
+    }
+    if (item_id == FOLDER_MONSTER_HUNTER_STORIES_3) {
+        return "怪物猎人物语3";
+    }
+    return display_name;
+}
 
 static int amiibo_scene_file_browser_list_item_cmp(const mui_list_item_t *p_item_a, const mui_list_item_t *p_item_b) {
     if (p_item_a->icon == ICON_HOME) {
@@ -58,7 +71,18 @@ static void amiibo_scene_file_browser_reload_folders(app_amiibo_t *app) {
                 continue;
             }
             uint16_t icon = obj.type == VFS_TYPE_DIR ? ICON_FOLDER : ICON_FILE;
-            mui_list_view_add_item(app->p_list_view, icon, obj.name, (void *)-1);
+            const char *display_name = obj.name;
+            uint32_t item_id = (uint32_t)-1;
+            if (obj.type == VFS_TYPE_DIR && settings_get_data()->language != LANGUAGE_ZH_HANS) {
+                if (strcmp(obj.name, "识质存在") == 0) {
+                    display_name = "PRAGMATA";
+                    item_id = FOLDER_PRAGMATA;
+                } else if (strcmp(obj.name, "怪物猎人物语3") == 0) {
+                    display_name = "Monster Hunter Stories 3: Twisted Reflection";
+                    item_id = FOLDER_MONSTER_HUNTER_STORIES_3;
+                }
+            }
+            mui_list_view_add_item(app->p_list_view, icon, display_name, (void *)item_id);
         }
         p_vfs_driver->close_dir(&dir);
     } else {
@@ -74,7 +98,8 @@ static void amiibo_scene_file_browser_on_selected(mui_list_view_event_t event, m
     app_amiibo_t *app = p_list_view->user_data;
     uint32_t idx = (uint32_t)p_item->user_data;
 
-    string_set(app->current_file, p_item->text);
+    const char *actual_name = amiibo_scene_file_browser_folder_name(idx, string_get_cstr(p_item->text));
+    string_set_str(app->current_file, actual_name);
 
     if (event == MUI_LIST_VIEW_EVENT_SELECTED) {
         if (idx == FOLDER_LIST_PARENT) {
@@ -95,7 +120,7 @@ static void amiibo_scene_file_browser_on_selected(mui_list_view_event_t event, m
                 if (!string_end_with_str_p(app->current_folder, "/")) {
                     string_cat_str(app->current_folder, "/");
                 }
-                string_cat(app->current_folder, p_item->text);
+                string_cat_str(app->current_folder, actual_name);
                 amiibo_scene_file_browser_reload_folders(app);
             } else if (p_item->icon == ICON_HOME) {
                 mini_app_launcher_kill(mini_app_launcher(), MINI_APP_ID_AMIIBO);
@@ -112,6 +137,10 @@ static void amiibo_scene_file_browser_on_selected(mui_list_view_event_t event, m
 void amiibo_scene_file_browser_on_enter(void *user_data) {
     app_amiibo_t *app = user_data;
     NRF_LOG_INFO("%X", app);
+    // The detail view keeps a second copy of all filenames for left/right navigation.
+    // Release it before rebuilding a large directory in the browser.
+    string_array_clear(app->amiibo_files);
+    string_array_init(app->amiibo_files);
     mui_list_view_set_selected_cb(app->p_list_view, amiibo_scene_file_browser_on_selected);
     mui_list_view_set_user_data(app->p_list_view, app);
 
