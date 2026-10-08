@@ -8,6 +8,54 @@
 #include "mui_icons.h"
 #include "settings.h"
 #include <math.h>
+#include "vfs.h"
+#include "vfs_meta.h"
+#include <stdio.h>
+#include <string.h>
+
+#define PLATFORM_FIRST 200
+#define PLATFORM_LAST 203
+#define VISIBILITY_FILE "/db-visible.bin"
+/* Stable game IDs, independent of language and sort order. */
+static uint8_t visibility[37]; /* magic[4], selected[32], show_all */
+static bool is_platform(uint16_t id) { return id >= PLATFORM_FIRST && id <= PLATFORM_LAST; }
+static bool game_selected(uint8_t id) { return (visibility[4 + id / 8] & (1u << (id % 8))) != 0; }
+static void visibility_load(void) {
+    memset(visibility, 0, sizeof(visibility));
+    memcpy(visibility, "DBG1", 4);
+    uint8_t saved[sizeof(visibility)];
+    vfs_driver_t *driver = vfs_get_default_driver();
+    if (driver && driver->mounted() &&
+        driver->read_file_data(VISIBILITY_FILE, saved, sizeof(saved)) == (int32_t)sizeof(saved) &&
+        memcmp(saved, "DBG1", 4) == 0 && saved[36] <= 1) {
+        memcpy(visibility, saved, sizeof(saved));
+    }
+}
+static bool visibility_save(void) {
+    vfs_driver_t *driver = vfs_get_default_driver();
+    if (!driver || !driver->mounted()) return false;
+    if (driver->write_file_data(VISIBILITY_FILE, visibility, sizeof(visibility)) != (int32_t)sizeof(visibility)) return false;
+    vfs_meta_t meta;
+    memset(&meta, 0, sizeof(meta));
+    meta.has_flags = true;
+    meta.flags = VFS_OBJ_FLAG_HIDDEN;
+    uint8_t encoded[VFS_MAX_META_LEN];
+    vfs_meta_encode(encoded, sizeof(encoded), &meta);
+    driver->update_file_meta(VISIBILITY_FILE, encoded, sizeof(encoded));
+    return true;
+}
+static const char *game_name(const db_game_t *game) {
+    return settings_get_data()->language == LANGUAGE_ZH_HANS ? game->name_cn : game->name_en;
+}
+static void selected_count(uint8_t platform, unsigned *selected, unsigned *total) {
+    *selected = *total = 0;
+    for (const db_game_t *game = game_list; game->game_id; ++game) {
+        if (game->parent_game_id == platform) {
+            ++*total;
+            if (game_selected(game->game_id)) ++*selected;
+        }
+    }
+}
 
 static void amiidb_scene_game_list_reload(app_amiidb_t *app);
 
@@ -34,6 +82,29 @@ static void amiidb_scene_game_list_list_view_on_selected(mui_list_view_event_t e
                                                          mui_list_item_t *p_item) {
     uint16_t icon = p_item->icon;
     app_amiidb_t *app = mui_list_view_get_user_data(p_list_view);
+    uint16_t current = app->game_id_path[app->game_id_index];
+    if (icon == ICON_SETTINGS || (is_platform(current) && icon == ICON_FOLDER)) {
+        if (event != MUI_LIST_VIEW_EVENT_SELECTED) return;
+        uint8_t previous[sizeof(visibility)];
+        memcpy(previous, visibility, sizeof(previous));
+        if (icon == ICON_SETTINGS) visibility[36] ^= 1;
+        else {
+            const db_game_t *game = p_item->user_data;
+            visibility[4 + game->game_id / 8] ^= (1u << (game->game_id % 8));
+        }
+        if (!visibility_save()) {
+            memcpy(visibility, previous, sizeof(previous));
+            mui_toast_view_show(app->p_toast_view,
+                settings_get_data()->language == LANGUAGE_ZH_HANS ? "保存失败" : "Save failed");
+            return;
+        }
+        uint16_t focus = mui_list_view_get_focus(p_list_view);
+        uint16_t scroll = mui_list_view_get_scroll_offset(p_list_view);
+        amiidb_scene_game_list_reload(app);
+        mui_list_view_set_focus(p_list_view, focus);
+        mui_list_view_set_scroll_offset(p_list_view, scroll);
+        return;
+    }
     switch (icon) {
     case ICON_EXIT:
         if (app->game_id_index <= 0) {
@@ -45,7 +116,7 @@ static void amiidb_scene_game_list_list_view_on_selected(mui_list_view_event_t e
 
     case ICON_FOLDER: {
         const db_game_t *p_game = p_item->user_data;
-        if (app->game_id_index + 1 >= sizeof(app->game_id_path) / sizeof(app->game_id_path[0])) {
+        if ((size_t)app->game_id_index + 1 >= sizeof(app->game_id_path) / sizeof(app->game_id_path[0])) {
             break;
         }
         app->game_focus_path[app->game_id_index] = mui_list_view_get_focus(p_list_view);
@@ -77,7 +148,7 @@ static int amiidb_scene_game_list_list_view_sort_cb(const mui_list_item_t *p_ite
         db_game_t *p_game_b = (db_game_t *)p_item_b->user_data;
         settings_data_t *p_settings_data = settings_get_data();
         if (p_settings_data->amiidb_sort_column == AMIIDB_SORT_COLUMN_NAME) {
-            return strcmp(p_game_a->name_en, p_game_b->name_en);
+            return strcmp(game_name(p_game_a), game_name(p_game_b));
         } else {
             return p_game_b->order - p_game_a->order;
         }
@@ -92,24 +163,44 @@ static int amiidb_scene_game_list_list_view_sort_cb(const mui_list_item_t *p_ite
 
 static void amiidb_scene_game_list_reload(app_amiidb_t *app) {
     settings_data_t *p_settings_data = settings_get_data();
-    char txt[64];
+    char txt[192];
 
     // clear list view
     mui_list_view_clear_items(app->p_list_view);
 
-    // add game list TODO FIX THIS
-    uint8_t cur_game_id = app->game_id_path[app->game_id_index];
-    const db_game_t *p_game = game_list;
-    while (p_game->game_id > 0) {
-        if (p_game->parent_game_id == cur_game_id) {
-            sprintf(txt, "%s (%d)", (p_settings_data->language == LANGUAGE_ZH_HANS ? p_game->name_cn : p_game->name_en),
-                    p_game->link_cnt);
-            mui_list_view_add_item(app->p_list_view, ICON_FOLDER, txt, (void *)p_game);
+    uint16_t cur_game_id = app->game_id_path[app->game_id_index];
+    if (cur_game_id == 0) {
+        /* Keep the four category controls first, in platform order. */
+        for (uint16_t id = PLATFORM_FIRST; id <= PLATFORM_LAST; ++id) {
+            for (const db_game_t *game = game_list; game->game_id; ++game) {
+                if (game->game_id != id) continue;
+                unsigned selected, total;
+                selected_count(id, &selected, &total);
+                snprintf(txt, sizeof(txt), "%s (%u/%u)", game_name(game), selected, total);
+                mui_list_view_add_item(app->p_list_view, ICON_FOLDER, txt, (void *)game);
+            }
         }
-        p_game++;
+        mui_list_view_add_item(app->p_list_view, ICON_SETTINGS,
+            p_settings_data->language == LANGUAGE_ZH_HANS ?
+                (visibility[36] ? "显示全部 [开]" : "显示全部 [关]") :
+                (visibility[36] ? "Show all [ON]" : "Show all [OFF]"), NULL);
+        for (const db_game_t *game = game_list; game->game_id; ++game) {
+            if (is_platform(game->parent_game_id) && (visibility[36] || game_selected(game->game_id))) {
+                mui_list_view_add_item(app->p_list_view, ICON_FOLDER, game_name(game), (void *)game);
+            }
+        }
+    } else {
+        for (const db_game_t *game = game_list; game->game_id; ++game) {
+            if (game->parent_game_id != cur_game_id) continue;
+            if (is_platform(cur_game_id)) {
+                snprintf(txt, sizeof(txt), "[%c] %s", game_selected(game->game_id) ? 'x' : ' ', game_name(game));
+            } else {
+                snprintf(txt, sizeof(txt), "%s (%u)", game_name(game), game->link_cnt);
+            }
+            mui_list_view_add_item(app->p_list_view, ICON_FOLDER, txt, (void *)game);
+        }
+        mui_list_view_sort(app->p_list_view, amiidb_scene_game_list_list_view_sort_cb);
     }
-    // game sort by order
-    mui_list_view_sort(app->p_list_view, amiidb_scene_game_list_list_view_sort_cb);
 
     // add link list by page
     const db_link_t *p_link = link_list;
@@ -121,11 +212,8 @@ static void amiidb_scene_game_list_reload(app_amiidb_t *app) {
             if (add_cnt < LIST_VIEW_ITEM_MAX_COUNT) {
                 const db_amiibo_t *p_amiibo = get_amiibo_by_id(p_link->head, p_link->tail);
                 if (p_amiibo) {
-                    const char *name = get_amiibo_display_name(p_amiibo);
+                    const char *name = get_amiibo_display_name((db_amiibo_t *)p_amiibo);
                     mui_list_view_add_item(app->p_list_view, ICON_FILE, name, (void *)p_amiibo);
-                } else {
-                    sprintf(txt, "Amiibo[%08x:%08x]", p_link->head, p_link->tail);
-                    mui_list_view_add_item(app->p_list_view, ICON_FILE, txt, (void *)p_amiibo);
                 }
                 add_cnt++;
             }
@@ -147,6 +235,11 @@ static void amiidb_scene_game_list_reload(app_amiidb_t *app) {
 
 void amiidb_scene_game_list_on_enter(void *user_data) {
     app_amiidb_t *app = (app_amiidb_t *)user_data;
+    visibility_load();
+    if (app->game_id_index >= sizeof(app->game_id_path) / sizeof(app->game_id_path[0])) {
+        app->game_id_index = 0;
+        app->game_id_path[0] = 0;
+    }
     mui_scene_dispatcher_set_back_cb(app->p_scene_dispatcher, amiidb_scene_game_list_back);
     amiidb_scene_game_list_reload(app);
     amiidb_scene_game_list_restore_position(app);

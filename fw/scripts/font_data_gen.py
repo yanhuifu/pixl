@@ -9,6 +9,7 @@ import platform
 # Absolute path to the directories containing the .c files
 current_dir = os.path.dirname(os.path.abspath(__file__))
 source_dirs = [
+    os.path.join(current_dir, "../application/src/app/amiidb"),
     os.path.join(current_dir, "../application/src/i18n"),
     os.path.join(current_dir, "../application/src/amiidb"),
 ]
