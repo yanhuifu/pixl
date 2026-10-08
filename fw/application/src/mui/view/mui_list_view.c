@@ -1,6 +1,7 @@
 #include "mui_list_view.h"
 #include "nrf_log.h"
 #include "settings.h"
+#include "mui_icons.h"
 
 #define LIST_ITEM_HEIGHT 13
 
@@ -52,6 +53,21 @@ static void mui_list_view_gap_anim_exec(void *p, int32_t value) {
     p_view->item_gap = value;
 }
 
+/* Pixel clipping also handles partially visible rows while scrolling. */
+static void mui_list_view_draw_checkbox(mui_canvas_t *canvas, int32_t y, bool checked) {
+    for (uint8_t row = 0; row < 10; ++row) {
+        int32_t cy = y + row;
+        if (cy < 0 || cy >= mui_canvas_get_height(canvas)) continue;
+        for (uint8_t x = 0; x < 10; ++x) {
+            bool border = row == 0 || row == 9 || x == 0 || x == 9;
+            bool tick = (x == 2 && row == 5) || (x == 3 && row == 6) ||
+                        (x == 4 && row == 7) || (x == 5 && row == 6) ||
+                        (x == 6 && row == 5) || (x == 7 && row == 4);
+            if (border || (checked && tick)) mui_canvas_draw_dot(canvas, x + 1, (uint8_t)cy);
+        }
+    }
+}
+
 static void mui_list_view_on_draw(mui_view_t *p_view, mui_canvas_t *p_canvas) {
     mui_canvas_set_font(p_canvas, u8g2_font_wqy12_t_gb2312a);
     mui_list_view_t *p_mui_list_view = p_view->user_data;
@@ -77,7 +93,11 @@ static void mui_list_view_on_draw(mui_view_t *p_view, mui_canvas_t *p_canvas) {
         if (y >= -LIST_ITEM_HEIGHT && y <= mui_canvas_get_height(p_canvas)) { // visible object
             uint32_t actual_y = index * p_mui_list_view->item_gap - offset_y;
             mui_canvas_set_font(p_canvas, u8g2_font_siji_t_6x10);
-            mui_canvas_draw_glyph(p_canvas, 0, actual_y + 10, item->icon);
+            if (item->icon == ICON_CHECKBOX_OFF || item->icon == ICON_CHECKBOX_ON) {
+                mui_list_view_draw_checkbox(p_canvas, (int32_t)actual_y + 1, item->icon == ICON_CHECKBOX_ON);
+            } else {
+                mui_canvas_draw_glyph(p_canvas, 0, actual_y + 10, item->icon);
+            }
             mui_canvas_set_font(p_canvas, u8g2_font_wqy12_t_gb2312a);
             mui_canvas_get_clip_window(p_canvas, &clip_win_prev);
             clip_win_cur.x = 13;

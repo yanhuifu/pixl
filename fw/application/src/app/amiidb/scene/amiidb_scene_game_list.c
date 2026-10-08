@@ -15,6 +15,7 @@
 
 #define PLATFORM_FIRST 200
 #define PLATFORM_LAST 203
+#define PLATFORM_MENU 204 /* virtual view, not a database game ID */
 #define VISIBILITY_FILE "/db-visible.bin"
 /* Stable game IDs, independent of language and sort order. */
 static uint8_t visibility[37]; /* magic[4], selected[32], show_all */
@@ -83,7 +84,19 @@ static void amiidb_scene_game_list_list_view_on_selected(mui_list_view_event_t e
     uint16_t icon = p_item->icon;
     app_amiidb_t *app = mui_list_view_get_user_data(p_list_view);
     uint16_t current = app->game_id_path[app->game_id_index];
-    if (icon == ICON_SETTINGS || (is_platform(current) && icon == ICON_FOLDER)) {
+    if (icon == ICON_SETTINGS && current == 0) {
+        if (event != MUI_LIST_VIEW_EVENT_SELECTED) return;
+        if ((size_t)app->game_id_index + 1 >= sizeof(app->game_id_path) / sizeof(app->game_id_path[0])) return;
+        app->game_focus_path[app->game_id_index] = mui_list_view_get_focus(p_list_view);
+        app->game_scroll_path[app->game_id_index] = mui_list_view_get_scroll_offset(p_list_view);
+        app->game_id_path[++app->game_id_index] = PLATFORM_MENU;
+        app->game_focus_path[app->game_id_index] = 0;
+        app->game_scroll_path[app->game_id_index] = 0;
+        amiidb_scene_game_list_reload(app);
+        return;
+    }
+    if ((icon == ICON_SETTINGS && current == PLATFORM_MENU) ||
+        (is_platform(current) && (icon == ICON_CHECKBOX_OFF || icon == ICON_CHECKBOX_ON))) {
         if (event != MUI_LIST_VIEW_EVENT_SELECTED) return;
         uint8_t previous[sizeof(visibility)];
         memcpy(previous, visibility, sizeof(previous));
@@ -142,23 +155,14 @@ static void amiidb_scene_game_list_list_view_on_selected(mui_list_view_event_t e
     }
 }
 
-static int amiidb_scene_game_list_list_view_sort_cb(const mui_list_item_t *p_item_a, const mui_list_item_t *p_item_b) {
-    if (p_item_a->icon == ICON_FOLDER && p_item_b->icon == ICON_FOLDER) {
-        db_game_t *p_game_a = (db_game_t *)p_item_a->user_data;
-        db_game_t *p_game_b = (db_game_t *)p_item_b->user_data;
-        settings_data_t *p_settings_data = settings_get_data();
-        if (p_settings_data->amiidb_sort_column == AMIIDB_SORT_COLUMN_NAME) {
-            return strcmp(game_name(p_game_a), game_name(p_game_b));
-        } else {
-            return p_game_b->order - p_game_a->order;
-        }
-    } else if (p_item_a->icon == ICON_FOLDER && p_item_b->icon == ICON_FILE) {
-        return -1;
-    } else {
-        db_amiibo_t *p_amiibo_a = (db_amiibo_t *)p_item_a->user_data;
-        db_amiibo_t *p_amiibo_b = (db_amiibo_t *)p_item_b->user_data;
-        return strcmp(p_amiibo_a->name_en, p_amiibo_b->name_en);
+/* Sorting is called only on directory/checkbox rows, before tag rows or controls. */
+static int amiidb_scene_game_list_list_view_sort_cb(const mui_list_item_t *a, const mui_list_item_t *b) {
+    const db_game_t *ga = a->user_data;
+    const db_game_t *gb = b->user_data;
+    if (settings_get_data()->amiidb_sort_column == AMIIDB_SORT_COLUMN_NAME) {
+        return strcmp(game_name(ga), game_name(gb));
     }
+    return gb->order - ga->order;
 }
 
 static void amiidb_scene_game_list_reload(app_amiidb_t *app) {
@@ -170,7 +174,16 @@ static void amiidb_scene_game_list_reload(app_amiidb_t *app) {
 
     uint16_t cur_game_id = app->game_id_path[app->game_id_index];
     if (cur_game_id == 0) {
-        /* Keep the four category controls first, in platform order. */
+        /* "View" opens the selected games directly, as in the reference video. */
+        for (const db_game_t *game = game_list; game->game_id; ++game) {
+            if (is_platform(game->parent_game_id) && (visibility[36] || game_selected(game->game_id))) {
+                mui_list_view_add_item(app->p_list_view, ICON_FOLDER, game_name(game), (void *)game);
+            }
+        }
+        mui_list_view_sort(app->p_list_view, amiidb_scene_game_list_list_view_sort_cb);
+        mui_list_view_add_item(app->p_list_view, ICON_SETTINGS,
+            p_settings_data->language == LANGUAGE_ZH_HANS ? "显示更多游戏" : "More games", NULL);
+    } else if (cur_game_id == PLATFORM_MENU) {
         for (uint16_t id = PLATFORM_FIRST; id <= PLATFORM_LAST; ++id) {
             for (const db_game_t *game = game_list; game->game_id; ++game) {
                 if (game->game_id != id) continue;
@@ -184,20 +197,17 @@ static void amiidb_scene_game_list_reload(app_amiidb_t *app) {
             p_settings_data->language == LANGUAGE_ZH_HANS ?
                 (visibility[36] ? "显示全部 [开]" : "显示全部 [关]") :
                 (visibility[36] ? "Show all [ON]" : "Show all [OFF]"), NULL);
-        for (const db_game_t *game = game_list; game->game_id; ++game) {
-            if (is_platform(game->parent_game_id) && (visibility[36] || game_selected(game->game_id))) {
-                mui_list_view_add_item(app->p_list_view, ICON_FOLDER, game_name(game), (void *)game);
-            }
-        }
     } else {
         for (const db_game_t *game = game_list; game->game_id; ++game) {
             if (game->parent_game_id != cur_game_id) continue;
             if (is_platform(cur_game_id)) {
-                snprintf(txt, sizeof(txt), "[%c] %s", game_selected(game->game_id) ? 'x' : ' ', game_name(game));
+                mui_list_view_add_item(app->p_list_view,
+                    game_selected(game->game_id) ? ICON_CHECKBOX_ON : ICON_CHECKBOX_OFF,
+                    game_name(game), (void *)game);
             } else {
                 snprintf(txt, sizeof(txt), "%s (%u)", game_name(game), game->link_cnt);
+                mui_list_view_add_item(app->p_list_view, ICON_FOLDER, txt, (void *)game);
             }
-            mui_list_view_add_item(app->p_list_view, ICON_FOLDER, txt, (void *)game);
         }
         mui_list_view_sort(app->p_list_view, amiidb_scene_game_list_list_view_sort_cb);
     }
