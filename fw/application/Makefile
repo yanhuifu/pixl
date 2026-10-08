@@ -683,8 +683,8 @@ LDFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 LDFLAGS += -Wl,--gc-sections
 # use newlib in nano version
 LDFLAGS += --specs=nano.specs
-LDFLAGS += -u _printf_float
-
+# No floating-point printf formats are used; avoid pulling in the float formatter.
+LDFLAGS += -Wl,--print-memory-usage
 pixljs: CFLAGS += -D__HEAP_SIZE=4096
 pixljs: CFLAGS += -D__STACK_SIZE=8192
 pixljs: ASMFLAGS += -D__HEAP_SIZE=4096
