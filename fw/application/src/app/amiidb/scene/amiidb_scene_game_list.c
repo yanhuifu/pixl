@@ -24,6 +24,12 @@ static bool game_selected(uint8_t id) { return (visibility[4 + id / 8] & (1u << 
 static void visibility_load(void) {
     memset(visibility, 0, sizeof(visibility));
     memcpy(visibility, "DBG1", 4);
+    /* First-use defaults; a valid saved selection replaces these below. */
+    static const uint8_t defaults[] = {4, 1, 11, 12, 34, 51, 46, 26, 47};
+    for (size_t i = 0; i < sizeof(defaults) / sizeof(defaults[0]); ++i) {
+        uint8_t id = defaults[i];
+        visibility[4 + id / 8] |= (1u << (id % 8));
+    }
     uint8_t saved[sizeof(visibility)];
     vfs_driver_t *driver = vfs_get_default_driver();
     if (driver && driver->mounted() &&

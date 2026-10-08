@@ -15,8 +15,21 @@
 #include "amiidb_api_db.h"
 #include "amiidb_api_fav.h"
 #include "amiidb_api_slot.h"
+#include "amiidb_api_autorand.h"
 
 APP_TIMER_DEF(m_amiibo_gen_delay_timer);
+
+static void amiidb_scene_autorand_refresh(app_amiidb_t *app) {
+    uint8_t game_id = AMIIDB_AUTORAND_OTHER;
+    if (app->prev_scene_id == AMIIDB_SCENE_GAME_LIST || app->prev_scene_id == AMIIDB_SCENE_FAV_LIST) {
+        game_id = app->p_amiibo_view->game_id;
+    } else if (app->prev_scene_id == AMIIDB_SCENE_AMIIBO_SEARCH && app->cur_amiibo &&
+               (app->cur_amiibo->head >> 24) == 0x01) {
+        game_id = AMIIDB_AUTORAND_SEARCH_ZELDA;
+    }
+    app->auto_rand_game_id = game_id;
+    app->auto_rand_enabled = amiidb_autorand_get(game_id);
+}
 
 static void ntag_update_cb(ntag_event_type_t type, void *context, ntag_t *p_ntag) {
 
@@ -30,8 +43,7 @@ static void ntag_update_cb(ntag_event_type_t type, void *context, ntag_t *p_ntag
         }
         mui_update(mui());
     } else if (type == NTAG_EVENT_TYPE_READ) {
-        settings_data_t *p_settings = settings_get_data();
-        if (p_settings->auto_gen_amiibo && amiibo_helper_is_key_loaded()) {
+        if (app->auto_rand_enabled && amiibo_helper_is_key_loaded()) {
             app_timer_stop(m_amiibo_gen_delay_timer);
             app_timer_start(m_amiibo_gen_delay_timer, APP_TIMER_TICKS(1000), app);
         }
@@ -173,7 +185,9 @@ static void amiidb_scene_amiibo_search_update(app_amiidb_t *app) { amiidb_scene_
 
 static void ntag_generate_timer_handler(void *p_context) {
     app_amiidb_t *app = p_context;
-    if (app->prev_scene_id == AMIIDB_SCENE_GAME_LIST || app->prev_scene_id == AMIIDB_SCENE_FAV_LIST) {
+    if (app->auto_rand_enabled && amiibo_helper_is_key_loaded() &&
+        (app->prev_scene_id == AMIIDB_SCENE_GAME_LIST || app->prev_scene_id == AMIIDB_SCENE_FAV_LIST ||
+         app->prev_scene_id == AMIIDB_SCENE_AMIIBO_SEARCH)) {
         amiidb_scene_amiibo_game_list_generate(app);
     }
     mui_update(mui());
@@ -185,6 +199,7 @@ static void amiidb_scene_amiibo_view_on_event(amiibo_view_event_t event, amiibo_
         app->cur_slot_index = amiibo_view_get_focus(app->p_amiibo_view);
         mui_scene_dispatcher_next_scene(app->p_scene_dispatcher, AMIIDB_SCENE_AMIIBO_DETAIL_MENU);
     } else if (event == AMIIBO_VIEW_EVENT_UPDATE) {
+        app_timer_stop(m_amiibo_gen_delay_timer);
         if (app->prev_scene_id == AMIIDB_SCENE_GAME_LIST) {
             amiidb_scene_amiibo_game_list_update(app);
         } else if (app->prev_scene_id == AMIIDB_SCENE_FAV_LIST) {
@@ -194,6 +209,7 @@ static void amiidb_scene_amiibo_view_on_event(amiibo_view_event_t event, amiibo_
         } else if (app->prev_scene_id == AMIIDB_SCENE_AMIIBO_SEARCH) {
             amiidb_scene_amiibo_search_update(app);
         }
+        amiidb_scene_autorand_refresh(app);
     }
 }
 static void amiidb_scene_amiibo_detail_menu_msg_box_no_key_cb(mui_msg_box_event_t event, mui_msg_box_t *p_msg_box) {
@@ -233,6 +249,7 @@ void amiidb_scene_amiibo_detail_on_enter(void *user_data) {
         amiidb_scene_amiibo_search_list_init(app);
     }
 
+    amiidb_scene_autorand_refresh(app);
     ntag_emu_set_update_cb(ntag_update_cb, app);
     mui_view_dispatcher_switch_to_view(app->p_view_dispatcher, AMIIDB_VIEW_ID_DETAIL);
     int32_t err_code =

@@ -18,6 +18,7 @@
 #include "mini_app_registry.h"
 
 #include "amiidb_api_slot.h"
+#include "amiidb_api_autorand.h"
 
 static enum amiidb_detail_menu_t {
     AMIIDB_DETAIL_MENU_RAND_UID,
@@ -105,11 +106,14 @@ static void amiidb_scene_amiibo_detail_menu_on_selected(mui_list_view_event_t ev
             return;
         }
         char txt[32];
-        settings_data_t *p_settings = settings_get_data();
-        p_settings->auto_gen_amiibo = !p_settings->auto_gen_amiibo;
-        snprintf(txt, sizeof(txt), "%s",
-                 p_settings->auto_gen_amiibo ? getLangString(_L_ON_F) : getLangString(_L_OFF_F));
-        settings_save();
+        bool enabled = !app->auto_rand_enabled;
+        if (!amiidb_autorand_set(app->auto_rand_game_id, enabled)) {
+            mui_toast_view_show(app->p_toast_view,
+                settings_get_data()->language == LANGUAGE_ZH_HANS ? "保存失败" : "Save failed");
+            return;
+        }
+        app->auto_rand_enabled = enabled;
+        snprintf(txt, sizeof(txt), "%s", enabled ? getLangString(_L_ON_F) : getLangString(_L_OFF_F));
 
         string_set_str(p_item->sub_text, txt);
 
@@ -151,7 +155,7 @@ void amiidb_scene_amiibo_detail_menu_on_enter(void *user_data) {
     char txt[32];
     settings_data_t *p_settings = settings_get_data();
 
-    snprintf(txt, sizeof(txt), "%s", p_settings->auto_gen_amiibo ? getLangString(_L_ON_F) : getLangString(_L_OFF_F));
+    snprintf(txt, sizeof(txt), "%s", app->auto_rand_enabled ? getLangString(_L_ON_F) : getLangString(_L_OFF_F));
     mui_list_view_add_item_ext(app->p_list_view, 0xe1c6, getLangString(_L_AUTO_RANDOM_GENERATION), txt,
                                (void *)AMIIDB_DETAIL_MENU_AUTO_RAND_UID);
 
