@@ -21,9 +21,10 @@
 static uint8_t visibility[37]; /* magic[4], selected[32], show_all */
 static bool is_platform(uint16_t id) { return id >= PLATFORM_FIRST && id <= PLATFORM_LAST; }
 static bool game_selected(uint8_t id) { return (visibility[4 + id / 8] & (1u << (id % 8))) != 0; }
+static bool visibility_save(void);
 static void visibility_load(void) {
     memset(visibility, 0, sizeof(visibility));
-    memcpy(visibility, "DBG1", 4);
+    memcpy(visibility, "DBG2", 4);
     /* First-use defaults; a valid saved selection replaces these below. */
     static const uint8_t defaults[] = {4, 1, 11, 12, 34, 51, 46, 26, 47};
     for (size_t i = 0; i < sizeof(defaults) / sizeof(defaults[0]); ++i) {
@@ -34,8 +35,23 @@ static void visibility_load(void) {
     vfs_driver_t *driver = vfs_get_default_driver();
     if (driver && driver->mounted() &&
         driver->read_file_data(VISIBILITY_FILE, saved, sizeof(saved)) == (int32_t)sizeof(saved) &&
-        memcmp(saved, "DBG1", 4) == 0 && saved[36] <= 1) {
+        (memcmp(saved, "DBG1", 4) == 0 || memcmp(saved, "DBG2", 4) == 0) && saved[36] <= 1) {
+        bool legacy = memcmp(saved, "DBG1", 4) == 0;
+        bool old_defaults = legacy && saved[36] == 0;
+        for (unsigned id = 0; id < 256 && old_defaults; ++id) {
+            bool selected = (saved[4 + id / 8] & (1u << (id % 8))) != 0;
+            if (selected != (id == 1 || id == 4 || id == 11)) old_defaults = false;
+        }
+        if (old_defaults) {
+            /* Persist the migration before accepting further checkbox changes. */
+            visibility_save();
+            return;
+        }
         memcpy(visibility, saved, sizeof(saved));
+        if (legacy) {
+            memcpy(visibility, "DBG2", 4);
+            visibility_save();
+        }
     }
 }
 static bool visibility_save(void) {
