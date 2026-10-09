@@ -19,17 +19,21 @@ static void app_amiidb_on_kill(mini_app_inst_t *p_app_inst);
 static void app_amiidb_on_event(mini_app_inst_t *p_app_inst, mini_app_event_t *p_event);
 
 static void app_amiidb_try_mount_drive(app_amiidb_t *p_app_inst) {
+    (void)p_app_inst;
+    if (!vfs_drive_enabled(VFS_DRIVE_EXT)) return;
     vfs_driver_t *p_driver = vfs_get_driver(VFS_DRIVE_EXT);
-    if (p_driver->mounted()) {
-        amiibo_helper_try_load_amiibo_keys_from_vfs();
-    } else {
-        int32_t err = p_driver->mount();
-        amiibo_helper_try_load_amiibo_keys_from_vfs();
-    }
+    if (!p_driver) return;
+    if (!p_driver->mounted() && p_driver->mount() != VFS_OK) return;
+    amiibo_helper_try_load_amiibo_keys_from_vfs();
 
-    p_driver->create_dir("/amiibo");
-    p_driver->create_dir("/amiibo/fav");
-    p_driver->create_dir("/amiibo/data");
+    /* Browsing must not rewrite existing SPIFFS directory markers on every launch. */
+    static const char *const paths[] = {"/amiibo", "/amiibo/fav", "/amiibo/data"};
+    vfs_obj_t obj;
+    for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]); ++i) {
+        if (p_driver->stat_file(paths[i], &obj) == VFS_ERR_NOOBJ) {
+            if (p_driver->create_dir(paths[i]) != VFS_OK) return;
+        }
+    }
 }
 
 void app_amiidb_on_run(mini_app_inst_t *p_app_inst) {
