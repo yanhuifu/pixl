@@ -253,6 +253,11 @@ static void nfc_received_process(const uint8_t *p_data, size_t data_length, uint
         hal_send_ack_nack(0xA);
         break;
     case NFC_CMD_SECTOR_SELECT:
+        /* First sector-select frame is exactly C2 FF (CRC removed by HAL). */
+        if (data_length != 2 || p_data[1] != 0xFF) {
+            hal_send_ack_nack(0x0);
+            break;
+        }
         NRF_LOG_INFO("NFC Sector Select start");
         hal_send_ack_nack(0xA);
         ntag_emu.is_selecting_sector = true;
@@ -286,6 +291,9 @@ static void nfc_callback(void *p_context, hal_nfc_event_t event, const uint8_t *
         break;
     case HAL_NFC_EVENT_FIELD_OFF:
         bsp_board_led_off(BSP_BOARD_LED_0);
+        /* A new RF session must not inherit an unfinished sector selection. */
+        ntag_emu.is_selecting_sector = false;
+        ntag_emu.sector = 0;
         if (ntag_emu.dirty) {
             ntag_event_type_t type = NTAG_EVENT_TYPE_WRITTEN;
             app_sched_event_put(&type, sizeof(ntag_event_type_t), update_ntag_handler);
