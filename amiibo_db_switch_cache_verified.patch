@@ -1,0 +1,30 @@
+diff --git a/fw/application/src/app/amiidb/scene/amiidb_scene_amiibo_detail.c b/fw/application/src/app/amiidb/scene/amiidb_scene_amiibo_detail.c
+--- a/fw/application/src/app/amiidb/scene/amiidb_scene_amiibo_detail.c
++++ b/fw/application/src/app/amiidb/scene/amiidb_scene_amiibo_detail.c
+@@ -19,3 +19,8 @@
+ APP_TIMER_DEF(m_amiibo_gen_delay_timer);
+ 
++// Cache auto-random setting while the Amiibo detail view is open.
++static bool s_autorand_cache_valid = false;
++static uint8_t s_autorand_cache_game_id;
++static bool s_autorand_cache_enabled;
++
+ static void amiidb_scene_autorand_refresh(app_amiidb_t *app) {
+@@ -29,5 +34,10 @@
+         game_id = AMIIDB_AUTORAND_SEARCH_ZELDA;
+     }
++    if (!s_autorand_cache_valid || s_autorand_cache_game_id != game_id) {
++        s_autorand_cache_enabled = amiidb_autorand_get(game_id);
++        s_autorand_cache_game_id = game_id;
++        s_autorand_cache_valid = true;
++    }
+     app->auto_rand_game_id = game_id;
+-    app->auto_rand_enabled = app->ntag.type != NTAG_I2C_PLUS_2K && amiidb_autorand_get(game_id);
++    app->auto_rand_enabled = app->ntag.type != NTAG_I2C_PLUS_2K && s_autorand_cache_enabled;
+ }
+@@ -252,3 +261,5 @@
+ void amiidb_scene_amiibo_detail_on_enter(void *user_data) {
+     app_amiidb_t *app = user_data;
++    // Refresh cache after returning from menus where settings may change.
++    s_autorand_cache_valid = false;
+     amiibo_view_set_ntag(app->p_amiibo_view, &app->ntag);
