@@ -32,6 +32,7 @@
 #define ICON_DENY           0xe1cf
 
 /* UI-only icons, drawn directly instead of relying on font glyphs. */
+#define ICON_AIRPLANE     0xfffb
 #define ICON_CHECKBOX_OFF 0xfffc
 #define ICON_CHECKBOX_ON  0xfffd
 

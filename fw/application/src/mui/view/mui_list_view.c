@@ -68,6 +68,18 @@ static void mui_list_view_draw_checkbox(mui_canvas_t *canvas, int32_t y, bool ch
     }
 }
 
+/* Compact top-view aircraft, fitting the same icon column as the font icons. */
+static void mui_list_view_draw_airplane(mui_canvas_t *canvas, int32_t y) {
+    static const uint16_t rows[10] = {0x020, 0x020, 0x070, 0x070, 0x0f8,
+                                      0x3fe, 0x7ff, 0x070, 0x0f8, 0x1dc};
+    for (uint8_t row = 0; row < 10; ++row) {
+        int32_t cy = y + row;
+        if (cy < 0 || cy >= mui_canvas_get_height(canvas)) continue;
+        for (uint8_t x = 0; x < 11; ++x)
+            if (rows[row] & (1u << x)) mui_canvas_draw_dot(canvas, x, (uint8_t)cy);
+    }
+}
+
 static void mui_list_view_on_draw(mui_view_t *p_view, mui_canvas_t *p_canvas) {
     mui_canvas_set_font(p_canvas, u8g2_font_wqy12_t_gb2312a);
     mui_list_view_t *p_mui_list_view = p_view->user_data;
@@ -95,6 +107,8 @@ static void mui_list_view_on_draw(mui_view_t *p_view, mui_canvas_t *p_canvas) {
             mui_canvas_set_font(p_canvas, u8g2_font_siji_t_6x10);
             if (item->icon == ICON_CHECKBOX_OFF || item->icon == ICON_CHECKBOX_ON) {
                 mui_list_view_draw_checkbox(p_canvas, (int32_t)actual_y + 1, item->icon == ICON_CHECKBOX_ON);
+            } else if (item->icon == ICON_AIRPLANE) {
+                mui_list_view_draw_airplane(p_canvas, (int32_t)actual_y + 1);
             } else {
                 mui_canvas_draw_glyph(p_canvas, 0, actual_y + 10, item->icon);
             }

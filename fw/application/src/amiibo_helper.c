@@ -6,8 +6,10 @@
 #include "vfs.h"
 
 #include "utils2.h"
+#include "app/amiidb/api/amiidb_v3_machines.h"
 
 #include <string.h>
+#include <stdio.h>
 
 #define UUID_OFFSET 468
 #define AMII_ID_OFFSET 476
@@ -91,7 +93,8 @@ void amiibo_helper_set_defaults(uint8_t *buffer, const uint8_t uuid[], bool tag_
     // ntag data 2
     memcpy(buffer, Internal_StaticLock, 8);
     // set BCC
-    buffer[0] = uuid[3] ^ uuid[4] ^ uuid[5] ^ uuid[6];
+    buffer[0] = tag_v3 ? 0x44 : uuid[3] ^ uuid[4] ^ uuid[5] ^ uuid[6];
+    if (tag_v3) buffer[1] = 0x00;
 
     amiibo_helper_replace_uuid(buffer, uuid, tag_v3);
     amiibo_helper_replace_password(buffer, uuid);
@@ -229,25 +232,20 @@ ret_code_t amiibo_helper_generate_amiibo_v3(uint32_t head, uint32_t tail, ntag_t
         return NRF_ERROR_INVALID_DATA;
     }
 
-    // Step 1: Generate regular amiibo data first
-    ret_code_t err_code = amiibo_helper_generate_amiibo_ntag215(head, tail, ntag);
-    if (err_code != NRF_SUCCESS) {
-        return err_code;
-    }
-
-    // Step 2: Convert to v3 format (NTAG_I2C_PLUS_2K)
+    /* Build the authenticated payload with the direct V3 UID layout.
+     * Shifting an already signed NTAG215 payload leaves the wrong UID/HMAC. */
+    memset(ntag, 0, sizeof(*ntag));
     ntag->type = NTAG_I2C_PLUS_2K;
-    
-    // Calculate the size of data that needs to be moved back (from 0x80 onwards)
-    size_t data_to_move_size = NTAG_DATA_SIZE - 0x80;
-    
-    // Move data from 0x80 onwards 0x40 bytes back to make room for new_nonce
-    // Using memmove for safe overlapping memory operations
-    memmove(ntag->data + 0x80 + 0x40, ntag->data + 0x80, data_to_move_size);
-    
-    // Clear the new_nonce area (0x40 bytes at 0x80)
-    memset(ntag->data + 0x80, 0, 0x40);
-    
+    ret_code_t err_code = ntag_store_uuid_rand(ntag);
+    if (err_code != NRF_SUCCESS) return err_code;
+    uint8_t uuid[UUID_SIZE];
+    amiibo_helper_get_uuid(ntag, uuid);
+    uint8_t modified[NTAG215_SIZE] = {0};
+    int32_to_bytes_le(head, modified + AMII_ID_OFFSET);
+    int32_to_bytes_le(tail, modified + AMII_ID_OFFSET + 4);
+    amiibo_helper_set_defaults(modified, uuid, true);
+    nfc3d_amiibo_pack(&amiibo_keys, modified, ntag->data, true);
+
     // Calculate total size after adding new_nonce
     size_t total_size_after_nonce = NTAG_DATA_SIZE + 0x40;
     
@@ -278,26 +276,17 @@ ret_code_t amiibo_helper_generate_amiibo_v3(uint32_t head, uint32_t tail, ntag_t
     // Add 8 bytes of zeros
     memset(ntag->data + 0x3B8, 0, 8);
     
-    // Generate sram_data directly in ntag->data memory
-    size_t sram_data_offset = 0x3C0;
-    size_t sram_data_size = 0x40;
-    
-    // Clear sram_data area
-    memset(ntag->data + sram_data_offset, 0, sram_data_size);
-    
-    // Calculate CRC16-MCRF4XX for sram_data (first 0x3e bytes)
-    uint16_t crc = crc16_mcrf4xx(ntag->data + sram_data_offset, 0x3e);
-    
-    // Add CRC to sram_data (big endian)
-    ntag->data[sram_data_offset + 0x3e] = (crc >> 8) & 0xFF;
-    ntag->data[sram_data_offset + 0x3f] = crc & 0xFF;
-    
-    // Add padding to reach 256*4 bytes (1024 bytes)
-    size_t padding_start = sram_data_offset + sram_data_size;
-    if (padding_start < 1024) {
-        memset(ntag->data + padding_start, 0, 1024 - padding_start);
+    /* Each response includes the measured machine identity and its CRC.
+     * Unknown V3 series are left alone; this mapping is only for Air Riders. */
+    if (amiidb_v3_has_machines(tail)) {
+        uint8_t machine = 0;
+        if (head == 0x1f030100) machine = 1;
+        else if (head == 0x1f010000) machine = 2;
+        else if (head == 0x1f020000) machine = 3;
+        else if (head == 0x1f040000) machine = 4;
+        amiidb_v3_set_machine(ntag, machine);
     }
-    
+
     return NRF_SUCCESS;
 }
 

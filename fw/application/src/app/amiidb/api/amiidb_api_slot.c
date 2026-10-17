@@ -19,10 +19,12 @@ int32_t amiidb_api_slot_read(uint8_t slot, ntag_t *p_ntag) {
         return -1;
     }
 
+    if (!is_valid_amiibo_ntag_by_size(fd.size)) return -1;
+    memset(p_ntag, 0, sizeof(*p_ntag));
     memset(&meta, 0, sizeof(vfs_meta_t));
     vfs_meta_decode(fd.meta, sizeof(fd.meta), &meta);
     int32_t res = p_vfs_driver->read_file_data(path, p_ntag->data, sizeof(p_ntag->data));
-    if (res < 0) {
+    if (res != fd.size) {
         return -1;
     }
 
@@ -46,7 +48,7 @@ int32_t amiidb_api_slot_write(uint8_t slot, ntag_t *p_ntag) {
 
     sprintf(path, "/amiibo/data/%02d.bin", slot);
     vfs_driver_t *p_vfs_driver = vfs_get_driver(VFS_DRIVE_EXT);
-    int32_t res = p_vfs_driver->write_file_data(path, p_ntag->data, sizeof(p_ntag->data));
+    int32_t res = p_vfs_driver->write_file_data(path, p_ntag->data, _ntag_data_size(p_ntag));
     if (res < 0) {
         // TODO msg box
         return -1;

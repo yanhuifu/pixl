@@ -90,14 +90,15 @@ static void update_ntag_handler(void *p_event_data, uint16_t event_size);
 
 static void nfc_received_process(const uint8_t *p_data, size_t data_length, uint8_t *plain) {
     nrf_pwr_mgmt_feed();
-
-    if (p_data == NULL || plain == NULL || data_length == 0) {
-        hal_send_ack_nack(0x0);
-        return;
-    }
+    if (!p_data || data_length == 0) return;
 
     if (ntag_emu.is_selecting_sector) {
         ntag_emu.is_selecting_sector = false;
+        if (data_length != 4 || p_data[0] > (ntag_emu.ntag.type == NTAG_I2C_PLUS_2K ? 1 : 0) ||
+            p_data[1] || p_data[2] || p_data[3]) {
+            hal_send_ack_nack(0x0);
+            return;
+        }
         ntag_emu.sector = p_data[0];
         NRF_LOG_INFO("NFC Sector Select Done (switch to %d)", p_data[0]);
 
@@ -108,20 +109,14 @@ static void nfc_received_process(const uint8_t *p_data, size_t data_length, uint
     }
 
     uint8_t command = p_data[0];
-    uint8_t block_num = data_length >= 2 ? p_data[1] : 0;
-    const size_t tag_bytes = _ntag_data_size(&ntag_emu.ntag);
+    uint8_t block_num = data_length > 1 ? p_data[1] : 0;
+    if ((command == NFC_CMD_READ || command == NFC_CMD_WRITE) && data_length < 2) return;
 
     switch (command) {
     case NFC_CMD_READ:
         NRF_LOG_INFO("NFC Read Block %d", block_num);
         int full_block = ((int) ntag_emu.sector * 256 + block_num);
-        if (data_length < 2 || full_block < 0 ||
-            (size_t)full_block * 4 > tag_bytes ||
-            tag_bytes - (size_t)full_block * 4 < 16) {
-            hal_send_ack_nack(0x0);
-            break;
-        }
-        {
+        if ((full_block + 3) * 4 < _ntag_data_size(&ntag_emu.ntag)) {
             static uint8_t chunk_data[16] = {0};
             memcpy(chunk_data, &plain[full_block*4], 16);
 
@@ -134,16 +129,14 @@ static void nfc_received_process(const uint8_t *p_data, size_t data_length, uint
             }
 
             APP_ERROR_CHECK(hal_nfc_send(chunk_data, 16));
-        }            
+        } else {
+            hal_send_ack_nack(0x0);
+        }
         break;
     case N2_CMD_WRITE:
         // similar to write but with one extra paramter to specify the bank number
-        if (data_length != 7) {
-            hal_send_ack_nack(0x0);
-            break;
-        }
         NRF_LOG_INFO("N2E Write slot:%d:", p_data[2]);
-        block_num = p_data[1];
+        if (data_length != 7) { hal_send_ack_nack(0x0); return; }
         data_length = 6;
         p_data = p_data + 1;
     case NFC_CMD_WRITE:
@@ -153,11 +146,13 @@ static void nfc_received_process(const uint8_t *p_data, size_t data_length, uint
             hal_send_ack_nack(0x0);
             return;
         }
-        if (data_length == 6 &&
-            ((size_t)ntag_emu.sector * 256 + block_num) * 4 <= tag_bytes &&
-            tag_bytes - ((size_t)ntag_emu.sector * 256 + block_num) * 4 >= 4) {
+        if (data_length == 6) {
             ntag_emu.dirty = true;
             int full_block_num = (((int) ntag_emu.sector) * 256) + block_num;
+            if ((full_block_num + 1) * 4 > _ntag_data_size(&ntag_emu.ntag)) {
+                hal_send_ack_nack(0x0);
+                return;
+            }
             if (ntag_emu.ntag.type == NTAG_215 && (full_block_num == 133 || full_block_num == 134)) {
                 // ignore
             } else if (full_block_num == 2) {
@@ -186,24 +181,16 @@ static void nfc_received_process(const uint8_t *p_data, size_t data_length, uint
         hal_nfc_send(NTAG215_Signature, 32);
         break;
     case N2_CMD_FAST_READ: // TODO
-        if (data_length < 4) {
-            hal_send_ack_nack(0x0);
-            break;
-        }
+        if (data_length < 4) { hal_send_ack_nack(0x0); return; }
         NRF_LOG_INFO("N2E Fast Read slot %d:", p_data[3]);
     case NFC_CMD_FAST_READ:
-        if (data_length < 3) {
-            hal_send_ack_nack(0x0);
-            break;
-        }
+        if (data_length < 3) { hal_send_ack_nack(0x0); return; }
         int start_page = block_num + (ntag_emu.sector * 256);
         int end_page = p_data[2] + (ntag_emu.sector * 256);
         int page_count = end_page - start_page + 1;
-        if (start_page < 0 || end_page < start_page ||
-            (size_t)end_page >= tag_bytes / 4 ||
-            (size_t)page_count * 4 > 255u) {
+        if (page_count <= 0 || (end_page + 1) * 4 > _ntag_data_size(&ntag_emu.ntag)) {
             hal_send_ack_nack(0x0);
-            break;
+            return;
         }
 
         if (ntag_emu.ntag.type == NTAG_I2C_PLUS_2K && start_page == 0xed && end_page == 0xed) {
@@ -219,10 +206,7 @@ static void nfc_received_process(const uint8_t *p_data, size_t data_length, uint
         }
         break;
     case NFC_CMD_PWD_AUTH:
-        if (data_length < 5) {
-            hal_send_ack_nack(0x0);
-            break;
-        }
+        if (data_length < 5) { hal_send_ack_nack(0x0); return; }
         NRF_LOG_INFO("NFC Password: %x %x %x %x", p_data[1], p_data[2], p_data[3], p_data[4]);
         hal_nfc_send(NTAG215_PwdOK, 2);
         break;
@@ -238,11 +222,10 @@ static void nfc_received_process(const uint8_t *p_data, size_t data_length, uint
         hal_nfc_send(N2E_SELECT_BANK, 1);
         break;
     case N2_CMD_FAST_WRITE:
-        if (data_length < 4 || (size_t)p_data[3] > data_length - 4 ||
-            (size_t)block_num * 4 > tag_bytes ||
-            (size_t)p_data[3] > tag_bytes - (size_t)block_num * 4) {
+        if (data_length < 4 || data_length < (size_t)p_data[3] + 4 ||
+            (size_t)block_num * 4 + p_data[3] > _ntag_data_size(&ntag_emu.ntag) || ntag_emu.ntag.read_only) {
             hal_send_ack_nack(0x0);
-            break;
+            return;
         }
         NRF_LOG_INFO("N2E Fast Read slot %d:", p_data[2]);
         ntag_emu.dirty = true;
@@ -253,19 +236,19 @@ static void nfc_received_process(const uint8_t *p_data, size_t data_length, uint
         hal_send_ack_nack(0xA);
         break;
     case NFC_CMD_SECTOR_SELECT:
-        /* First sector-select frame is exactly C2 FF (CRC removed by HAL). */
-        if (data_length != 2 || p_data[1] != 0xFF) {
+        if (ntag_emu.ntag.type != NTAG_I2C_PLUS_2K || data_length != 2 || block_num != 0xff) {
             hal_send_ack_nack(0x0);
-            break;
+            return;
         }
         NRF_LOG_INFO("NFC Sector Select start");
         hal_send_ack_nack(0xA);
         ntag_emu.is_selecting_sector = true;
         break;
     case NFC_CMD_FAST_WRITE:
-        if (data_length < 3) {
+        if (ntag_emu.ntag.type != NTAG_I2C_PLUS_2K || ntag_emu.sector != 0 ||
+            data_length != 67 || block_num != 0xf0 || p_data[2] != 0xff) {
             hal_send_ack_nack(0x0);
-            break;
+            return;
         }
         // only supported for page 0xf0-0xff in sector 0 to write to sram buffer on i2c
         // for now we ignore the writes and just ack
@@ -287,13 +270,12 @@ static void nfc_callback(void *p_context, hal_nfc_event_t event, const uint8_t *
 
     switch (event) {
     case HAL_NFC_EVENT_FIELD_ON:
+        ntag_emu.sector = 0;
+        ntag_emu.is_selecting_sector = false;
         bsp_board_led_on(BSP_BOARD_LED_0);
         break;
     case HAL_NFC_EVENT_FIELD_OFF:
         bsp_board_led_off(BSP_BOARD_LED_0);
-        /* A new RF session must not inherit an unfinished sector selection. */
-        ntag_emu.is_selecting_sector = false;
-        ntag_emu.sector = 0;
         if (ntag_emu.dirty) {
             ntag_event_type_t type = NTAG_EVENT_TYPE_WRITTEN;
             app_sched_event_put(&type, sizeof(ntag_event_type_t), update_ntag_handler);

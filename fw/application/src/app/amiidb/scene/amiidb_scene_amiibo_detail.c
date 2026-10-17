@@ -16,6 +16,7 @@
 #include "amiidb_api_fav.h"
 #include "amiidb_api_slot.h"
 #include "amiidb_api_autorand.h"
+#include "amiidb_api_v3.h"
 
 APP_TIMER_DEF(m_amiibo_gen_delay_timer);
 
@@ -28,7 +29,7 @@ static void amiidb_scene_autorand_refresh(app_amiidb_t *app) {
         game_id = AMIIDB_AUTORAND_SEARCH_ZELDA;
     }
     app->auto_rand_game_id = game_id;
-    app->auto_rand_enabled = amiidb_autorand_get(game_id);
+    app->auto_rand_enabled = app->ntag.type != NTAG_I2C_PLUS_2K && amiidb_autorand_get(game_id);
 }
 
 static void ntag_update_cb(ntag_event_type_t type, void *context, ntag_t *p_ntag) {
@@ -36,7 +37,11 @@ static void ntag_update_cb(ntag_event_type_t type, void *context, ntag_t *p_ntag
     app_amiidb_t *app = context;
 
     if (type == NTAG_EVENT_TYPE_WRITTEN) {
-        memcpy(&app->ntag, p_ntag->data, sizeof(ntag_t));
+        memcpy(&app->ntag, p_ntag, sizeof(ntag_t));
+        if (app->ntag.type == NTAG_I2C_PLUS_2K && app->prev_scene_id != AMIIDB_SCENE_DATA_LIST &&
+            !amiidb_v3_save(&app->ntag)) {
+            mui_toast_view_show(app->p_toast_view, settings_get_data()->language == LANGUAGE_ZH_HANS ? "保存失败" : "Save failed");
+        }
         if (app->prev_scene_id == AMIIDB_SCENE_DATA_LIST) {
             uint8_t focus = amiibo_view_get_focus(app->p_amiibo_view);
             amiidb_api_slot_write(focus, &app->ntag);
@@ -52,7 +57,22 @@ static void ntag_update_cb(ntag_event_type_t type, void *context, ntag_t *p_ntag
 
 static void amiidb_scene_amiibo_game_list_generate(app_amiidb_t *app) {
     const db_amiibo_t *p_amiibo = app->cur_amiibo;
-    amiibo_helper_generate_amiibo(p_amiibo->head, p_amiibo->tail, &app->ntag);
+    bool v3 = is_valid_amiibo_v3(p_amiibo->head, p_amiibo->tail);
+    if (!v3 || !amiidb_v3_load(p_amiibo->head, p_amiibo->tail, &app->ntag)) {
+        ret_code_t result = amiibo_helper_generate_amiibo(p_amiibo->head, p_amiibo->tail, &app->ntag);
+        if (result != NRF_SUCCESS) {
+            ntag_store_new_rand(&app->ntag);
+            mui_toast_view_show(app->p_toast_view, settings_get_data()->language == LANGUAGE_ZH_HANS ? "生成失败" : "Generation failed");
+        } else if (v3 && !amiidb_v3_save(&app->ntag)) {
+            mui_toast_view_show(app->p_toast_view, settings_get_data()->language == LANGUAGE_ZH_HANS ? "保存失败" : "Save failed");
+        }
+    }
+    if (app->ntag.type == NTAG_I2C_PLUS_2K && amiidb_v3_has_machines(p_amiibo->tail)) {
+        uint8_t machine = amiidb_v3_machine_index(&app->ntag);
+        if (machine < AMIIDB_V3_MACHINE_COUNT) snprintf((char *)app->ntag.notes, sizeof(app->ntag.notes),
+            settings_get_data()->language == LANGUAGE_ZH_HANS ? "飞行器:%s\n按中键可切换飞行器" : "Machine:%s\nPress OK to change machine",
+            settings_get_data()->language == LANGUAGE_ZH_HANS ? amiidb_v3_machine_cn[machine] : amiidb_v3_machine_en[machine]);
+    }
     ntag_emu_set_tag(&app->ntag);
 }
 
@@ -260,5 +280,6 @@ void amiidb_scene_amiibo_detail_on_enter(void *user_data) {
 void amiidb_scene_amiibo_detail_on_exit(void *user_data) {
     app_amiidb_t *app = (app_amiidb_t *)user_data;
     app_timer_stop(m_amiibo_gen_delay_timer);
+    ntag_emu_set_update_cb(NULL, NULL);
     amiidb_fav_array_reset(app->fav_array);
 }
