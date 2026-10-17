@@ -134,9 +134,7 @@ static void nfc_received_process(const uint8_t *p_data, size_t data_length, uint
             }
 
             APP_ERROR_CHECK(hal_nfc_send(chunk_data, 16));
-        } else {
-            hal_send_ack_nack(0x0);
-        }
+        }            
         break;
     case N2_CMD_WRITE:
         // similar to write but with one extra paramter to specify the bank number
