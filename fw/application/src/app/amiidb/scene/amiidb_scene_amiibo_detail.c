@@ -229,7 +229,7 @@ static void amiidb_scene_amiibo_view_on_event(amiibo_view_event_t event, amiibo_
         } else if (app->prev_scene_id == AMIIDB_SCENE_AMIIBO_SEARCH) {
             amiidb_scene_amiibo_search_update(app);
         }
-        amiidb_scene_autorand_refresh(app);
+        /* Diagnostic: skip per-switch autorand refresh; entry refresh remains active. */
     }
 }
 static void amiidb_scene_amiibo_detail_menu_msg_box_no_key_cb(mui_msg_box_event_t event, mui_msg_box_t *p_msg_box) {
