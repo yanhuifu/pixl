@@ -115,7 +115,8 @@ static void amiidb_scene_amiibo_game_list_update(app_amiidb_t *app) {
         }
         p_link++;
     }
-    amiidb_scene_amiibo_game_list_generate(app);
+    // DIAGNOSTIC ONLY: NFC tag is NOT updated on left/right game switching.
+    // amiidb_scene_amiibo_game_list_generate(app);
 }
 
 static void amiidb_scene_amiibo_data_list_init(app_amiidb_t *app) {
