@@ -1,0 +1,12 @@
+name: NFC parser stress test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  nfc-parser-stress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run NFC parser stress test (ASan + UBSan)
+        run: python3 tests/nfc_stress/run_test.py
