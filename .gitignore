@@ -50,3 +50,6 @@ dist
 fw/scripts/.venv
 
 fw/temp
+*.ps1
+*.bak
+*.patch
