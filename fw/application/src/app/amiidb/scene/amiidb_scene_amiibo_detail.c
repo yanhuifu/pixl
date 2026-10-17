@@ -20,6 +20,10 @@
 
 APP_TIMER_DEF(m_amiibo_gen_delay_timer);
 
+/* Cache current game's links once on detail entry, avoiding a full DB scan per key. */
+static const db_link_t *s_game_link_index[255];
+static uint8_t s_game_link_count = 0;
+
 static void amiidb_scene_autorand_refresh(app_amiidb_t *app) {
     uint8_t game_id = AMIIDB_AUTORAND_OTHER;
     if (app->prev_scene_id == AMIIDB_SCENE_GAME_LIST || app->prev_scene_id == AMIIDB_SCENE_FAV_LIST) {
@@ -84,7 +88,10 @@ static void amiidb_scene_amiibo_game_list_init(app_amiidb_t *app) {
     uint8_t cur_game_id = app->game_id_path[app->game_id_index];
     while (p_link->game_id > 0) {
         if (p_link->game_id == cur_game_id) {
-            total++;
+            if (total < 255) {
+                s_game_link_index[total] = p_link;
+                total++;
+            }
             if (p_link->head == app->cur_amiibo->head && p_link->tail == app->cur_amiibo->tail) {
                 focus = total - 1;
             }
@@ -92,6 +99,7 @@ static void amiidb_scene_amiibo_game_list_init(app_amiidb_t *app) {
         p_link++;
     }
 
+    s_game_link_count = total;
     amiidb_scene_amiibo_game_list_generate(app);
 
     amiibo_view_set_max_ntags(app->p_amiibo_view, total);
@@ -102,18 +110,9 @@ static void amiidb_scene_amiibo_game_list_init(app_amiidb_t *app) {
 static void amiidb_scene_amiibo_game_list_update(app_amiidb_t *app) {
     uint8_t focus = amiibo_view_get_focus(app->p_amiibo_view);
 
-    const db_link_t *p_link = link_list;
-    uint8_t index = -1;
-    uint8_t cur_game_id = app->game_id_path[app->game_id_index];
-    while (p_link->game_id > 0) {
-        if (p_link->game_id == cur_game_id) {
-            index++;
-            if (index == focus) {
-                app->cur_amiibo = get_amiibo_by_id(p_link->head, p_link->tail);
-                break;
-            }
-        }
-        p_link++;
+    if (focus < s_game_link_count && s_game_link_index[focus] != NULL) {
+        const db_link_t *p_link = s_game_link_index[focus];
+        app->cur_amiibo = get_amiibo_by_id(p_link->head, p_link->tail);
     }
     amiidb_scene_amiibo_game_list_generate(app);
 }
