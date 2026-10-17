@@ -135,8 +135,8 @@ static void nfc_received_process(const uint8_t *p_data, size_t data_length, uint
         break;
     case N2_CMD_WRITE:
         // similar to write but with one extra paramter to specify the bank number
-        NRF_LOG_INFO("N2E Write slot:%d:", p_data[2]);
         if (data_length != 7) { hal_send_ack_nack(0x0); return; }
+        NRF_LOG_INFO("N2E Write slot:%d:", p_data[2]);
         data_length = 6;
         p_data = p_data + 1;
     case NFC_CMD_WRITE:
@@ -188,7 +188,8 @@ static void nfc_received_process(const uint8_t *p_data, size_t data_length, uint
         int start_page = block_num + (ntag_emu.sector * 256);
         int end_page = p_data[2] + (ntag_emu.sector * 256);
         int page_count = end_page - start_page + 1;
-        if (page_count <= 0 || (end_page + 1) * 4 > _ntag_data_size(&ntag_emu.ntag)) {
+        if (page_count <= 0 || page_count * 4 > 255 ||
+            (end_page + 1) * 4 > _ntag_data_size(&ntag_emu.ntag)) {
             hal_send_ack_nack(0x0);
             return;
         }
