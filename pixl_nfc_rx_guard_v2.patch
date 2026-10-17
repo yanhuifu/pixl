@@ -1,0 +1,25 @@
+--- a/fw/application/src/hal/hal_nfc_t2t.c
++++ b/fw/application/src/hal/hal_nfc_t2t.c
+@@ -767,13 +767,18 @@
+     if (NRF_NFCT->EVENTS_RXFRAMEEND && (NRF_NFCT->INTEN & NFCT_INTEN_RXFRAMEEND_Msk)) {
+         /* Take into account only number of whole bytes */
+         uint32_t rx_status = 0;
+-        uint32_t rx_data_size =
+-            ((NRF_NFCT->RXD.AMOUNT & NFCT_RXD_AMOUNT_RXDATABYTES_Msk) >> NFCT_RXD_AMOUNT_RXDATABYTES_Pos) -
+-            NFC_CRC_SIZE;
++        uint32_t rx_frame_size =
++            (NRF_NFCT->RXD.AMOUNT & NFCT_RXD_AMOUNT_RXDATABYTES_Msk) >> NFCT_RXD_AMOUNT_RXDATABYTES_Pos;
++        uint32_t rx_data_size = 0;
++        if (rx_frame_size < NFC_CRC_SIZE || rx_frame_size > NFC_RX_BUFFER_SIZE) {
++            rx_status = 1; /* Reject malformed frames before accessing the RX buffer. */
++        } else {
++            rx_data_size = rx_frame_size - NFC_CRC_SIZE;
++        }
+         nrf_nfct_event_clear(&NRF_NFCT->EVENTS_RXFRAMEEND);
+ 
+         if (NRF_NFCT->EVENTS_RXERROR && (NRF_NFCT->INTEN & NFCT_INTEN_RXERROR_Msk)) {
+-            rx_status = (NRF_NFCT->FRAMESTATUS.RX & NRF_NFCT_FRAMESTATUS_RX_MSK);
++            rx_status |= (NRF_NFCT->FRAMESTATUS.RX & NRF_NFCT_FRAMESTATUS_RX_MSK);
+             nrf_nfct_event_clear(&NRF_NFCT->EVENTS_RXERROR);
+ 
+             NRF_LOG_DEBUG("Rx error (0x%x)", (unsigned int)rx_status);
